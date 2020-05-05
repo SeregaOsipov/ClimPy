@@ -5,9 +5,9 @@ import os.path
 import glob
 import pandas as pd
 
-from Papers.AQABA.aqaba_utils import normalize_size_distribution
-from libs.diag_decorators import time_interval_selection
 from libs.file_path_utils import get_root_storage_path_on_hpc
+
+from climpy.diag_decorators import time_interval_selection, normalize_size_distribution
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
@@ -52,7 +52,7 @@ def get_station_file_path(station_mask, level, res, inv):
     :return:
     '''
 
-    files_list = get_station_file_path(station_mask, level, res, inv)
+    files_list = get_stations_file_path(station_mask, level, res, inv)
     if len(files_list) > 1:
         raise Exception('Aeronet: found more than one harbor that match {} in the {}'.format(station_mask, search_folder))
     if len(files_list) == 0:
@@ -71,6 +71,25 @@ def get_maritime_file_path(cruise, level, res):
 
     file_path = get_root_storage_path_on_hpc() + '/Data/NASA/Aeronet/Maritime/{}/AOD/{}_{}.lev{}'.format(cruise, cruise, res, level)
     return file_path
+
+
+def filter_stations(file_paths, filter_impl):
+    """
+    Loops through the stations, reads only the first row of data and applies filter
+    :param file_paths: list of file paths to process
+    :param filter_impl: function, which returns true or false. You should write your own version.
+    :return:
+    """
+    dfs = []
+    fps = []
+    # get metadata, this means head and tail
+    for file_path in file_paths:
+        # print(file_path)
+        if filter_impl(file_path):
+            dfs.append(df)
+            fps.append(file_path)
+
+    return fps, dfs
 
 
 def read_aeronet(aeronet_fp, inv=False, only_head=False):
