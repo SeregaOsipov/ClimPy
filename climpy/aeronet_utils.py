@@ -21,6 +21,17 @@ DAILY = 'daily'
 SERIS = 'series'
 
 
+def get_all_stations_and_coordinates():
+    """
+    get list of all Aeronet stations and their coordinates from the WEB
+    :return:
+    """
+    stations_url = 'https://aeronet.gsfc.nasa.gov/aeronet_locations_v3.txt'
+    import pandas as pd
+    stations = pd.read_csv(stations_url, skiprows=1)
+    return stations
+
+
 def get_stations_file_path(station_mask, level, res, inv):
     '''
 
@@ -54,9 +65,9 @@ def get_station_file_path(station_mask, level, res, inv):
 
     files_list = get_stations_file_path(station_mask, level, res, inv)
     if len(files_list) > 1:
-        raise Exception('Aeronet: found more than one harbor that match {} in the {}'.format(station_mask, search_folder))
+        raise Exception('Aeronet: found more than one harbor that match {} in the {}'.format(station_mask))
     if len(files_list) == 0:
-        raise Exception('Aeronet: can not find harbor that match {} in the {}'.format(station_mask, search_folder))
+        raise Exception('Aeronet: can not find harbor that match {} in the {}'.format(station_mask))
 
     return files_list[0]
 
@@ -80,16 +91,12 @@ def filter_stations(file_paths, filter_impl):
     :param filter_impl: function, which returns true or false. You should write your own version.
     :return:
     """
-    dfs = []
     fps = []
-    # get metadata, this means head and tail
     for file_path in file_paths:
         # print(file_path)
-        if filter_impl(file_path):
-            dfs.append(df)
+        if filter_impl(file_path):  # make sure that filter is computationally efficient
             fps.append(file_path)
-
-    return fps, dfs
+    return fps
 
 
 def read_aeronet(aeronet_fp, inv=False, only_head=False):
@@ -175,6 +182,7 @@ def get_aod_diag(station, var_key, level, res):
     vo = {}
     vo['data'] = aeronet_df[var_key].to_numpy()
     vo['time'] = aeronet_df.index.to_pydatetime()
+    # add some meta data
 
     return vo
 
