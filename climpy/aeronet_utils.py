@@ -5,8 +5,6 @@ import os.path
 import glob
 import pandas as pd
 
-from libs.file_path_utils import get_root_storage_path_on_hpc
-
 from climpy.diag_decorators import time_interval_selection, normalize_size_distribution
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
@@ -19,6 +17,10 @@ ALL_STATIONS = '*'
 ALL_POINTS = 'all_points'
 DAILY = 'daily'
 SERIS = 'series'
+
+
+# YOU HAVE TO UPDATE FILE PATH, before using the module
+DATA_FILE_PATH_ROOT = os.path.expanduser('~') + '/Data/NASA/Aeronet/'
 
 
 def get_all_stations_and_coordinates():
@@ -41,14 +43,14 @@ def get_stations_file_path(station_mask, level, res, inv):
     :return:
     '''
 
-    AOD_POSTFIX = '/AOD/AOD{}'.format(level)
-    INV_POSTFIX = '/INV/LEV{}/ALL'.format(level)
+    AOD_PRODUCT_PATH = 'AOD/AOD{}'.format(level)
+    INV_PRODUCT_PATH = 'INV/LEV{}/ALL'.format(level)
 
-    postfix = AOD_POSTFIX
+    product_path = AOD_PRODUCT_PATH
     if inv:
-        postfix = INV_POSTFIX
+        product_path = INV_PRODUCT_PATH
 
-    search_folder = get_root_storage_path_on_hpc() + '/Data/NASA/Aeronet/v3' + postfix + '/{}/'.format(res.upper())
+    search_folder = DATA_FILE_PATH_ROOT + 'v3/{}/{}/'.format(product_path, res.upper())
     files_list = glob.glob(search_folder + station_mask)
 
     return files_list
