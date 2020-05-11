@@ -22,9 +22,9 @@ To run it from the bash, see list of input args below.
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", help="pycharm")
 parser.add_argument("--port", help="pycharm")
-parser.add_argument("--aeronet_in", help="Aeronet file path, which contains AOD and INV folders (download all)")
-parser.add_argument("--wrf_in", help="WRF file path, for example, /storage/.../wrfout_d01_2017-*_00:00:00")
-parser.add_argument("--diags_out", help="Figures/diags file path, for example, /storage/.../Pictures/Paper/")
+parser.add_argument("--aeronet_in", help="Aeronet file path, which contains AOD and INV folders (download all)", required=True)
+parser.add_argument("--wrf_in", help="WRF file path, for example, /storage/.../wrfout_d01_2017-*_00:00:00", required=True)
+parser.add_argument("--diags_out", help="Figures/diags file path, for example, /storage/.../Pictures/Paper/", required=True)
 parser.add_argument("--aod_level", help="Aeronet AOD level", default=15)
 # TODO: add time range as input
 args = parser.parse_args()
@@ -44,7 +44,7 @@ if 'PYCHARM_HOSTED' not in os.environ.keys():
     pics_output_folder = args.diags_out
     aeronet.DATA_FILE_PATH_ROOT = args.aeronet_in
 
-print('STARTING DIAGS for wrf_in {} and Aeronet v{} in {} into {}'.format(wrf_file_path, aod_level, aeronet.DATA_FILE_PATH_ROOT, pics_output_folder))
+print('STARTING DIAGS for wrf_in {} \n and Aeronet v{} in {} \n into {}'.format(wrf_file_path, aod_level, aeronet.DATA_FILE_PATH_ROOT, pics_output_folder))
 
 # Preparations are done, start diags
 

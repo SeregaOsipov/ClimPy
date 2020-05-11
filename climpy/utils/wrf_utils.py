@@ -1,6 +1,6 @@
 from datetime import datetime
 import numpy as np
-import climpy.netcdf_utils as nc_utils
+import climpy.utils.netcdf_utils as nc_utils
 # from libs.readers import AbstractNetCdfReader as ancr
 import matplotlib.pyplot as plt
 
