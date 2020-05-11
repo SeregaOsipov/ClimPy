@@ -1,11 +1,13 @@
-from datetime import datetime, timedelta
+import datetime as dt
+from datetime import datetime
 import numpy as np
-from matplotlib import mlab
+from dateutil import relativedelta
 import os.path
 import glob
 import pandas as pd
+from shapely.geometry import Point
 
-from climpy.diag_decorators import time_interval_selection, normalize_size_distribution
+from climpy.utils.diag_decorators import time_interval_selection, normalize_size_distribution
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
@@ -32,6 +34,80 @@ def get_all_stations_and_coordinates():
     import pandas as pd
     stations = pd.read_csv(stations_url, skiprows=1)
     return stations
+
+
+def get_available_stations(time_range, aod_level):
+    """
+    returns the list of stations that have the time coverage for a specified level of AOD product.
+
+    Aeronet has a list of stations for each year and mask of availability for each month.
+    See "All lists" link on Aeronet website https://aeronet.gsfc.nasa.gov/Site_Lists_V3/site_index.html
+
+    The idea is to get big table with all stations for all the years, and then filter those that have temporal coverage.
+
+    :param time_range: [start_date end_date], datetime objects
+    :param aod_level: 10, 15 or 20
+    :return:
+    """
+
+    unique_years = np.arange(time_range[0].year, time_range[1].year + 1)
+    year = unique_years[0]
+
+    stations_soup = []
+    for year in unique_years:
+        stations_url = 'https://aeronet.gsfc.nasa.gov/Site_Lists_V3/aeronet_locations_v3_{}_lev{}.txt'.format(year, aod_level)
+        stations = pd.read_csv(stations_url, skiprows=1)
+        # add year information
+        stations['YEAR'] = pd.Series(year, index=stations.index)
+        stations_soup.append(stations)
+
+    stations_soup = pd.concat(stations_soup)
+
+    # now loop through the stations and check the temporal coverage
+    unique_names = stations_soup['Site_Name'].unique()
+    results = []
+    for name in unique_names:
+        subset = stations_soup[stations_soup['Site_Name'] == name]
+
+        available_dates = pd.DatetimeIndex([])
+        for index, row in subset.iterrows():
+            year = row['YEAR']
+            months = pd.date_range(start='{}-01-01'.format(year), periods=12, freq='MS')
+            available_dates = available_dates.append(months[row['JAN':'DEC'].to_numpy(dtype=bool)])
+
+        # round up the interval's dates because Aeronet has monthly availability dates
+        start_date = dt.datetime(time_range[0].year, time_range[0].month, 1)
+        end_date = dt.datetime(time_range[1].year, time_range[1].month, 1) + relativedelta.relativedelta(months=1)
+        is_covered = np.any(np.logical_and(available_dates >= start_date, available_dates < end_date))
+        if is_covered:
+            # results.append(name)
+            results.append(subset.iloc[0, 0:4])  # save the subset with the metadata
+
+
+    return pd.DataFrame(results)
+
+
+def filter_available_stations(domain, time_range, aod_level):
+    """
+    Return list of stations within the domain and time interval
+    :param domain:
+    :param time_range:
+    :param aod_level:
+    :return:
+    """
+    # list of stations, that have the temporal coverage
+    prelim_stations = get_available_stations(time_range, aod_level)
+
+    # filter stations within the domain
+    stations_inside_domain = pd.DataFrame(columns=prelim_stations.columns)
+    for index, station in prelim_stations.iterrows():
+        point = Point(station['Longitude(decimal_degrees)'], station['Latitude(decimal_degrees)'])
+        # TODO: this test does not account for the map projection distortions
+        if domain.contains(point):
+            stations_inside_domain = stations_inside_domain.append(station, ignore_index=True)
+
+    # overview
+    return stations_inside_domain
 
 
 def get_stations_file_path(station_mask, level, res, inv):
@@ -125,7 +201,7 @@ def read_aeronet(aeronet_fp, inv=False, only_head=False):
 
     aeronet_df = aeronet_df.set_index('time')#, inplace=True)
 
-    # Drop any rows that are all NaN and any cols that are all NaN
+    # TODO: Drop any rows that are all NaN and any cols that are all NaN
     # & then sort by the index
     # an = (aeronet.dropna(axis=1, how='all').dropna(axis=0, how='all').sort_index())
 
@@ -211,3 +287,5 @@ def get_size_distribution(station, level, res):
     aeronet_vo['radii'] = aeronet_sd.columns.to_numpy(dtype=np.float) # um
 
     return aeronet_vo
+
+

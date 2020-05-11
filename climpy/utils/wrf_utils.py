@@ -2,10 +2,36 @@ from datetime import datetime
 import numpy as np
 import climpy.netcdf_utils as nc_utils
 # from libs.readers import AbstractNetCdfReader as ancr
+import matplotlib.pyplot as plt
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 Z_DIM_NC_KEY = 'bottom_top'
+
+
+def plot_domain(nc):
+    """
+    quick way to plot the WRF simulation domain
+    :param nc:
+    :return:
+    """
+    # import to work with WRF output
+    import wrf as wrf  # wrf-python library https://wrf-python.readthedocs.io/en/latest/
+
+    fig = plt.figure(figsize=(12, 6))
+    # Set the GeoAxes to the projection used by WRF
+    cart_proj = wrf.get_cartopy(wrfin=nc)
+    ax = plt.axes(projection=cart_proj)
+    ax.coastlines('50m', linewidth=0.8)
+
+    # Set the map bounds
+    ax.set_xlim(wrf.cartopy_xlim(wrfin=nc))
+    ax.set_ylim(wrf.cartopy_ylim(wrfin=nc))
+
+    # Add the gridlines
+    ax.gridlines(color="black", linestyle="dotted")
+
+    return fig, ax
 
 
 def derive_wrf_net_flux_from_accumulated_value(nc, acc_down_name, acc_up_name, tyxSlicesArray, dt):
