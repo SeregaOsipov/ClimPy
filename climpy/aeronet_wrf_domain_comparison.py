@@ -17,34 +17,45 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 """
 This script plots WRF-Aeronet diagnostics within the WRF domain
 To run it from the bash, see list of input args below.
+
+
+Example (one line for copy-paste):
+python aeronet_wrf_domain_comparison.py --aeronet_in='/work/mm0062/b302074//Data/NASA/Aeronet/' --wrf_in=/work/mm0062/b302074/Data/AirQuality/AQABA/chem_106/output/wrfout_d01_2017-0*_00:00:00 --diags_out=/work/mm0062/b302074//Pictures//Papers/AirQuality/AQABA/chem_106/ --aod_level=15
+
+The same example (split for readability):
+python aeronet_wrf_domain_comparison.py
+        --aeronet_in='/work/mm0062/b302074//Data/NASA/Aeronet/'
+        --wrf_in=/work/mm0062/b302074/Data/AirQuality/AQABA/chem_106/output/wrfout_d01_2017-0*_00:00:00
+        --diags_out=/work/mm0062/b302074//Pictures//Papers/AirQuality/AQABA/chem_106/
+        --aod_level=15
 """
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--mode", help="pycharm")
-parser.add_argument("--port", help="pycharm")
 parser.add_argument("--aeronet_in", help="Aeronet file path, which contains AOD and INV folders (download all)", required=True)
 parser.add_argument("--wrf_in", help="WRF file path, for example, /storage/.../wrfout_d01_2017-*_00:00:00", required=True)
 parser.add_argument("--diags_out", help="Figures/diags file path, for example, /storage/.../Pictures/Paper/", required=True)
 parser.add_argument("--aod_level", help="Aeronet AOD level", default=15)
+# have to add those to make script Pycharm compatible
+parser.add_argument("--mode", help="pycharm")
+parser.add_argument("--port", help="pycharm")
 # TODO: add time range as input
 args = parser.parse_args()
 
 # this is my defaults for debugging
-aod_level = 15
-sim_version = 'chem_106'
-pics_output_folder = fpu.get_pictures_root_folder() + '/Papers/AirQuality/AQABA/{}/'.format(sim_version)
-wrf_file_path = fpu.get_root_storage_path_on_hpc() + '/Data/AirQuality/AQABA/chem_106/output/wrfout_d01_2017-*_00:00:00'
 aeronet.DATA_FILE_PATH_ROOT = fpu.get_aeronet_file_path_root()
+wrf_file_path = fpu.get_root_storage_path_on_hpc() + '/Data/AirQuality/AQABA/chem_106/output/wrfout_d01_2017-*_00:00:00'
+pics_output_folder = fpu.get_pictures_root_folder() + '/Papers/AirQuality/AQABA/{}/'.format('chem_106')
+aod_level = 15
 
 # parse the user input and override defaults
 if 'PYCHARM_HOSTED' not in os.environ.keys():
     print('Using the provided args')
-    aod_level = args.aod_level
+    aeronet.DATA_FILE_PATH_ROOT = args.aeronet_in
     wrf_file_path = args.wrf_in
     pics_output_folder = args.diags_out
-    aeronet.DATA_FILE_PATH_ROOT = args.aeronet_in
+    aod_level = args.aod_level
 
-print('STARTING DIAGS for wrf_in {} \n and Aeronet v{} in {} \n into {}'.format(wrf_file_path, aod_level, aeronet.DATA_FILE_PATH_ROOT, pics_output_folder))
+print('STARTING DIAGS for \n wrf_in {} \n Aeronet v{} in {} \n output diags into {}'.format(wrf_file_path, aod_level, aeronet.DATA_FILE_PATH_ROOT, pics_output_folder))
 
 # Preparations are done, start diags
 
