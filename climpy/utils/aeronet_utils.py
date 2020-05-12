@@ -2,10 +2,10 @@ import datetime as dt
 from datetime import datetime
 import numpy as np
 from dateutil import relativedelta
-import os.path
 import glob
 import pandas as pd
 from shapely.geometry import Point
+from climpy.utils.file_path_utils import get_aeronet_file_path_root
 
 from climpy.utils.diag_decorators import time_interval_selection, normalize_size_distribution
 
@@ -13,16 +13,20 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 
 # station constants
+
 ALL_STATIONS = '*'
 
 # temporal resolution constants
 ALL_POINTS = 'all_points'
 DAILY = 'daily'
-SERIS = 'series'
+MONTHLY = 'monthly'
+
+SERIES = 'series'
 
 
 # YOU HAVE TO UPDATE FILE PATH, before using the module
-DATA_FILE_PATH_ROOT = os.path.expanduser('~') + '/Data/NASA/Aeronet/'
+#DATA_FILE_PATH_ROOT = os.path.expanduser('~') + '/Data/NASA/Aeronet/'
+DATA_FILE_PATH_ROOT = get_aeronet_file_path_root()
 
 
 def get_all_stations_and_coordinates():
@@ -158,7 +162,7 @@ def get_maritime_file_path(cruise, level, res):
     :return:
     '''
 
-    file_path = get_root_storage_path_on_hpc() + '/Data/NASA/Aeronet/Maritime/{}/AOD/{}_{}.lev{}'.format(cruise, cruise, res, level)
+    file_path = DATA_FILE_PATH_ROOT + '/Maritime/{}/AOD/{}_{}.lev{}'.format(cruise, cruise, res, level)
     return file_path
 
 
@@ -177,24 +181,49 @@ def filter_stations(file_paths, filter_impl):
     return fps
 
 
-def read_aeronet(aeronet_fp, inv=False, only_head=False):
+def read_aeronet(aeronet_fp, only_head=False):
     '''
     Generic. Reads and parses entire Aeronet file
     :param aeronet_fp:
-    :param inv: TODO: it is possible to figure out INV or AOD type from the file itself
     :param only_head: is usefully to get only metadata from the file.
     :return:
     '''
 
+    # first read the header and figure out type of the format
+    with open(aeronet_fp) as f:
+        f.readline()  # Aeronet version
+        f.readline()  # Site_Name
+        header = f.readline()  # Version & Product AOD or Inversion
+        f.readline()  # quality controls
+        header_temporal = f.readline()  # Daily/Monthly, but Monthly AOD doesn't have the Monthly keyword
+        f.readline()  # UNITS cam be
+        column_keys = f.readline()
+
+    is_inv = False
+    if 'Inversion' in header:
+        is_inv = True
+
+    res = ALL_POINTS
+    if 'Daily' in header_temporal:
+        res = DAILY
+    if 'Month' in column_keys[0:5]:  #if 'Monthly' in header_temporal:
+        res = MONTHLY
+
+    # Proceed to reading data
+
+    # parsing settings depending on the file type
     time_cols = [0, 1]
-    if inv:
-        time_cols = [1, 2]
+    if is_inv: time_cols = [1, 2]
+    dateparse = lambda x: datetime.strptime(x, "%d:%m:%Y %H:%M:%S")
+
+    if res == MONTHLY:
+        time_cols = [0, ]
+        dateparse = lambda x: datetime.strptime(x, "%Y-%b")
 
     nrows = None
     if only_head:
         nrows = 1
 
-    dateparse = lambda x: datetime.strptime(x, "%d:%m:%Y %H:%M:%S")
     aeronet_df = pd.read_csv(aeronet_fp, skiprows=6, nrows=nrows,
                              na_values=['N/A', -999],
                              parse_dates={'time': time_cols}, date_parser=dateparse)
@@ -238,7 +267,7 @@ def get_aod_product(station, level, res):
 
 def get_inversion_product(station, level, res):
     aeronet_fp = get_station_file_path(station, level, res, inv=True)
-    aeronet_df = read_aeronet(aeronet_fp, inv=True)
+    aeronet_df = read_aeronet(aeronet_fp)
 
     return aeronet_df
 
@@ -287,5 +316,34 @@ def get_size_distribution(station, level, res):
     aeronet_vo['radii'] = aeronet_sd.columns.to_numpy(dtype=np.float) # um
 
     return aeronet_vo
+
+@time_interval_selection
+def get_refractive_index(station, level, res):
+    """
+    Extracts the refractive index from Aeronet df
+    :param station:
+    :param level:
+    :param res:
+    :return:
+    """
+    df = get_inversion_product(station, level, res)
+
+    # assume that Aeronet reports RI at 4 wls
+    re_ri_df = df.filter(regex='Refractive_Index-Real_Part').iloc[:, 0:4]
+    im_ri_df = df.filter(regex='Refractive_Index-Imaginary_Part').iloc[:, 0:4]
+
+    # get the wavelengths from the column labels
+    import re
+    wls = []
+    for label in re_ri_df.columns:
+        m = re.search('\[(.+?)nm\]', label)
+        wls.append(float(m.group(1)))
+
+    vo = {}
+    vo['data'] = re_ri_df.to_numpy() + 1j * im_ri_df.to_numpy()
+    vo['time'] = df.index.to_pydatetime()
+    vo['wl'] = np.array(wls)  # nm
+
+    return vo
 
 
