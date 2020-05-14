@@ -8,6 +8,10 @@ from climpy.utils.plotting_utils import get_JGR_full_page_width_inches, save_fig
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
+"""
+https://github.com/SeregaOsipov/ClimPy/wiki/Aerosols-infographic
+"""
+
 station = 'KAUST'
 # CASE 1: fine mode volume = coarse
 time_range = [dt.datetime(2012, 9, 28, 0, 0), dt.datetime(2012, 9, 29, 0, 0)]
