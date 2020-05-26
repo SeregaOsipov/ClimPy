@@ -26,13 +26,14 @@ def time_interval_selection(func):
 
         if time_range is not None:
             ind = np.logical_and(vo['time'] >= time_range[0], vo['time'] <= time_range[1])
-            vo['data'] = vo['data'][ind]
-            vo['time'] = vo['time'][ind]
             # if coordinates are time dependent, apply index too
+            # make sure to check the size first, and only then adjust it
             if 'lat' in vo.keys() and vo['data'].shape[0] == vo['lat'].shape[0]:
                 # TODO: check that lat and lon are not time dependant
                 vo['lat'] = vo['lat'][ind]
                 vo['lon'] = vo['lon'][ind]
+            vo['data'] = vo['data'][ind]
+            vo['time'] = vo['time'][ind]
         return vo
     return wrapper_decorator
 
