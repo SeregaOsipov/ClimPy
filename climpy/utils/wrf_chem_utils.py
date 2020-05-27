@@ -1,4 +1,79 @@
+import numpy as np
+
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
+
+
+MADE_MODES_SIGMA = (1.7, 2.0, 2.5)  # sginin, sginia, sginic # initial sigma-G for nuclei, acc, coarse modes
+
+
+def get_WRF_MADE_modpar(moment0_list, moment3_list, sg_list):
+    """
+    see ACKERMANN et al., 1998 MODAL AEROSOL DYNAMICS MODEL FOR EUROPE: DEVELOPMENT AND FIRST APPLICATIONS
+    https://www.sciencedirect.com/science/article/abs/pii/S1352231098000065
+
+    code was ported from WRF Chem module_aerosols_sorgam.f (and data)
+
+    :param moment0_list = (nu0, ac0, cor0)  # 0 moments
+    :param moment3_list = (nu3, ac3, cor3)  # 3rd moments
+    :param sg_list = (1.7, 2.0, 2.5)  # sginin, sginia, sginic # initial sigma-G for nuclei, acc, coarse modes
+
+    :return: median diameters computed as:
+    dgacc(lcell) = max(dgmin,(cblk(lcell,vac3)/(cblk(lcell,vac0)*esa36))**one3)
+    """
+
+    # TODO add cw_phase logic, see the source code
+    dg_list = ()
+    dgmin = 1.0E-09
+    for sgini, moment3, moment0 in zip(sg_list, moment3_list, moment0_list):
+        es36 = np.exp(0.125 * np.log(sgini) ** 2) ** 36
+        dg = (moment3 / (moment0 * es36)) ** (1 / 3)
+        dg[dg < dgmin] = dgmin
+        dg_list += (dg,)
+
+    # sginin = 1.70
+    # esn36 = np.exp(0.125*np.log(sginin) ** 2) ** 36
+    # dgacc = (ac3/ac0*esn36)**(1/3)
+    # dgmin = 1.0E-09
+    # dgacc[dgacc < dgmin] = dgmin
+
+    # !  initial mean diameter for nuclei mode [ m ]
+    #       PARAMETER (dginin=0.01E-6)
+    # !  initial mean diameter for accumulation mode [ m ]
+    #       PARAMETER (dginia=0.07E-6)
+    # ! initial mean diameter for coarse mode [ m ]
+    #       PARAMETER (dginic=1.0E-6)
+
+    return dg_list
+
+
+def sample_WRF_MADE_size_distributions(dp, sg_list, dg_list, moment3_list, moment0_list):
+    """
+
+    :param dp:
+    :param sg_list:
+    :param dg_list:
+    :param moment3_list:
+    :param moment0_list:
+    :return: the dNdlog(p) size distribution for each mode and scaled to total number of particles
+    """
+    dNdlogp_list = ()
+    for sg, dg, moment3, moment0 in zip(sg_list, dg_list, moment3_list, moment0_list):
+
+        # if sg/dg... are numbers, then convert them to arrays
+        if isinstance(sg, float):
+            sg = np.array(sg)
+            dg = np.array(dg)
+            moment3 = np.array(moment3)
+            moment0 = np.array(moment0)
+
+        # THIS one is faster then sp.stats.lognorm
+        dNdlogp = 1/((2*np.pi)**(1/2) * np.log(sg[..., np.newaxis])) * np.exp(-1/2 * (np.log(dp)-np.log(dg[..., np.newaxis]))**2 / np.log(sg[..., np.newaxis])**2)
+        # lognorm_dist = sp.stats.lognorm(s=np.log(sg[..., np.newaxis]), loc=0, scale=dg[..., np.newaxis])
+        # dNdlogp = dp * lognorm_dist.pdf(dp)
+        dNdlogp *= moment0[..., np.newaxis]  # this is the n(logdp) from ACKERMANN et al., equation 1
+        dNdlogp_list += (dNdlogp,)
+
+    return dNdlogp_list
 
 
 def get_chemistry_package_definition(chem_opt):
