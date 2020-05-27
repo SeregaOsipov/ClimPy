@@ -1,5 +1,6 @@
 import numpy as np
-
+import scipy as sp
+import scipy.special
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 
@@ -75,6 +76,38 @@ def sample_WRF_MADE_size_distributions(dp, sg_list, dg_list, moment3_list, momen
 
     return dNdlogp_list
 
+
+def compute_MADE_bounded_distribution_factors(d_min, d_max, sg_list, dg_list, moment3_list, moment0_list):
+    """
+    Computes the Number and Volume factors, that represent the contribution of the size distribution
+    to the total number of particles and volume for a given range of size.
+
+    :param d_min:
+    :param d_max:
+    :return: Returns 2 factors for number of particles and volume.
+    1st factor to multiply total mass and to get PM, i.e. PM[d>=d_min, d<=d_max] 10 = Total mass * factor
+    2nd factor to multiply total number of particles and to get N[d>=d_min, d<=d_max] i.e. N[d>min, d<max] = N_0 * factor
+    """
+    # this factors are the ratio that they contribute to the total number N_0 or volume V_0
+    N_factors = []
+    V_factors = []
+    for sg, dg, moment3, moment0 in zip(sg_list, dg_list, moment3_list, moment0_list):
+        d_v_median = dg * np.exp(3 * np.log(sg) ** 2)  # volume median diameter
+
+        # N[Dmin, Dmax] = N_0/2 * []
+        N_factor = 1 / 2 * (sp.special.erf(np.log(d_max / dg) / (2 ** 0.5 * np.log(sg))) - sp.special.erf(
+            np.log(d_min / dg) / (2 ** 0.5 * np.log(sg))))
+        # V[Dmin, Dmax] = V_0/2 * []   ! There is typo in equation 27, it should be V_0, not N_0
+        V_factor = 1 / 2 * (sp.special.erf(np.log(d_max / d_v_median) / (2 ** 0.5 * np.log(sg))) - sp.special.erf(
+            np.log(d_min / d_v_median) / (2 ** 0.5 * np.log(sg))))
+
+        # V_0 = N_0  * pi/6 * dg^3 * exp(9/2 ln(sg)^2)
+        # NtoV_factor = (np.pi / 6 * dg ** 3 * np.exp(9 / 2 * np.log(sg) ** 2)) ** -1
+
+        N_factors.append(N_factor)
+        V_factors.append(V_factor)
+
+    return N_factors, V_factors
 
 def get_chemistry_package_definition(chem_opt):
     """
