@@ -109,6 +109,33 @@ def compute_MADE_bounded_distribution_factors(d_min, d_max, sg_list, dg_list, mo
 
     return N_factors, V_factors
 
+
+def define_MADE_modes_by_aerosol_type(aerosols_keys):
+    """
+    MADE (WRF-Chem) defines 3 modes: Aitken, Accumulation and Coarse
+    This modes are index 0, 1 and 2.
+
+    This routine assigns each aerosol type to a mode index
+
+    Routine is used to compute PM V factors across different species
+
+    :param aerosols_keys:
+    :return: return key(aerosol type)-index dictionary
+    """
+
+    mode_indices = {}
+    for key in aerosols_keys:
+        # NOTE: this logic wil break, if the var names change
+        if key[-1] == 'i':
+            mode_indices[key] = 0
+        elif key[-1] == 'j':
+            mode_indices[key] = 1
+        else:  # antha, seas, soila
+            mode_indices[key] = 2
+
+    return mode_indices
+
+
 def get_chemistry_package_definition(chem_opt):
     """
     Copy-pasted from registry.chem
