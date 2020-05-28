@@ -94,6 +94,7 @@ def compute_MADE_bounded_distribution_factors(d_min, d_max, sg_list, dg_list, mo
     for sg, dg, moment3, moment0 in zip(sg_list, dg_list, moment3_list, moment0_list):
         d_v_median = dg * np.exp(3 * np.log(sg) ** 2)  # volume median diameter
 
+        # See for details https://patarnott.com/pdf/SizeDistributions.pdf, eqn 24-27
         # N[Dmin, Dmax] = N_0/2 * []
         N_factor = 1 / 2 * (sp.special.erf(np.log(d_max / dg) / (2 ** 0.5 * np.log(sg))) - sp.special.erf(
             np.log(d_min / dg) / (2 ** 0.5 * np.log(sg))))
