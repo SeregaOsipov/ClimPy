@@ -17,10 +17,10 @@ def get_full_screen_page_width_inches():
 
 def save_figure_bundle(root_folder, file_name):
     """
-    Saves figure in 3 formats, png dpi 300, svg and pdf
+    Saves figure in 3 formats, png dpi 600, svg and pdf
     :return:
     """
-    save_fig(root_folder, file_name + '.png', dpi=300)
+    save_fig(root_folder, file_name + '.png', dpi=600)
     save_fig(root_folder, file_name + '.svg')
     save_fig(root_folder, file_name + '.pdf')
 

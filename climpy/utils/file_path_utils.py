@@ -24,6 +24,8 @@ def get_aeronet_file_path_root():
 def convert_file_path_mask_to_list(file_path_mask, N_parts=None):
     files_list = glob.glob(file_path_mask)
     files_list = natsorted(files_list)
+
     if N_parts is not None:
         files_list = files_list[0:N_parts]
+
     return files_list
