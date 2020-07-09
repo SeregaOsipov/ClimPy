@@ -32,13 +32,26 @@ plt.figure()
 plt.contourf(anomaly_data, np.linspace(0, 0.5, 21), extend='both')
 plt.colorbar()
 
-# compare the two datasets
 
+# compare the two datasets
 plt.figure(constrained_layout=True, figsize=(10, 5))
 # plt.grid(True)
+
+ind = np.isnan(sparc_od_vo['data'])
+print('{} NaN values of the column AOD where ignored in the SAGE 1020 OD Filled'.format(np.sum(ind)))
+
 weight = np.cos(np.deg2rad(sparc_od_vo['lat']))
-data_to_plot = np.nansum(sparc_od_vo['data'] * weight, axis=1) / np.nansum(weight, axis=0)
-plt.plot(sparc_od_vo['time'], data_to_plot, label='Stratospheric Optical Depth (Filled)')
+# replicate weight for each time snapshot
+weight = np.repeat(weight[np.newaxis, :], sparc_od_vo['data'].shape[0], axis=0)
+
+# use masked array to properly average the data
+data_mx = np.ma.masked_array(sparc_od_vo['data'], mask=ind)
+# use the same mask for weight
+weight_mx = np.ma.masked_array(weight, mask=ind)
+# average
+data_to_plot = np.sum(data_mx * weight_mx, axis=1) / np.sum(weight_mx, axis=1)
+
+plt.plot(sparc_od_vo['time'], data_to_plot, '-o', ms=4,  label='Stratospheric Optical Depth (Filled)')
 
 # integrate extinction vertically to get AOD
 dz = 0.5  # km
