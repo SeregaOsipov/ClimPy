@@ -3,11 +3,11 @@ from climpy.utils.sparc_asap_sato_cmip_utils import prepare_sparc_asap_stratosph
     prepare_sparc_asap_vertically_resolved_data
 from climpy.utils.avhrr_utils import prepare_avhrr_aod
 from climpy.utils.climatology_utils import compute_daily_climatology
-from climpy.utils.plotting_utils import save_fig
+from climpy.utils.plotting_utils import save_fig, save_figure_bundle
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime as dt
-from libs.ranges.TimeRangeVO import TimeRangeVO
+from climpy.TimeRangeVO import TimeRangeVO
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
@@ -18,7 +18,7 @@ sparc_ext_profile_filled_vo = prepare_sparc_asap_vertically_resolved_data(True)
 # sparc_profile_output_set_unfilled = prepare_sparc_asap_vertically_resolved_data(None, False)
 
 climatology_time_range_vo = TimeRangeVO(dt.datetime(1989, 1, 1), dt.datetime(1991, 1, 1))
-avhrr_vo = prepare_avhrr_aod(TimeRangeVO(dt.datetime(1990, 1, 1), dt.datetime(1992, 1, 1)), zonal_mean=True)
+avhrr_vo = prepare_avhrr_aod(time_range=(dt.datetime(1990, 1, 1), dt.datetime(1992, 1, 1)), zonal_mean=True)
 
 anomaly_data, clim_data, yearly_data, unique_years = compute_daily_climatology(avhrr_vo['data'], avhrr_vo['time'], climatology_time_range_vo=climatology_time_range_vo)
 
@@ -63,7 +63,7 @@ plt.xlabel('Time')
 plt.ylabel('AOD')
 plt.title('ASAP AOD at 1.02 um')
 plt.legend()
-save_fig(pics_output_folder, 'asap AOD ts.png')
+save_figure_bundle(pics_output_folder, 'asap AOD ts')
 
 
 # Plot the Hovmoeller diagrams of the column AOD
@@ -88,7 +88,7 @@ plt.title('Altitude/Latitude, Interpolation, Filled')
 plt.xlim((dt.datetime(1979, 1, 1), dt.datetime(2005, 1, 1)))
 
 plt.suptitle('SPARC ASAP AOD at 1.02 um from different data sets', fontsize=24)
-save_fig(pics_output_folder, 'asap AOD howmoller.png')
+save_figure_bundle(pics_output_folder, 'asap AOD howmoller')
 
 diff = sparc_od_vo['data'][69:] - asap_aod_data_1020[:-24]
 plt.figure()
