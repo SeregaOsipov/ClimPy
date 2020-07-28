@@ -1,9 +1,8 @@
-__author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
-
 import functools
 import numpy as np
 import matplotlib
 
+__author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 def time_averaging(func):
     @functools.wraps(func)
@@ -32,6 +31,8 @@ def time_interval_selection(func):
                 # TODO: check that lat and lon are not time dependant
                 vo['lat'] = vo['lat'][ind]
                 vo['lon'] = vo['lon'][ind]
+            if vo['level'].shape[0] == vo['data'].shape[0]:
+                vo['level'] = vo['level'][ind]
             vo['data'] = vo['data'][ind]
             vo['time'] = vo['time'][ind]
         return vo
@@ -78,13 +79,55 @@ def convert_dates_to_years_since_first_date(func):
     return wrapper_decorator
 
 
+def lonlat_weight_averaging(func):
+    @functools.wraps(func)
+    def wrapper_decorator(*args, **kwargs):
+        weights = None
+        if 'surface_area' in kwargs:
+            weights = kwargs.pop('surface_area')
+        else:
+            raise Exception('lonlat_weight_averaging', 'weight for spatial averaging is missing')
+
+        vo = func(*args, **kwargs)
+
+        # if the pressure is 4d, weight it too
+        if vo['level'].shape[-2:] == vo['data'].shape[-2:]:
+            vo['level'] = np.sum(vo['level'] * weights, axis=(-2, -1)) / np.sum(weights)
+
+        vo['data'] = np.sum(vo['data'] * weights, axis=(-2, -1)) / np.sum(weights)
+        return vo
+
+    return wrapper_decorator
+
+
 def lon_averaging(func):
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
         vo = func(*args, **kwargs)
-        vo['data'] = np.nanmean(vo['data'], axis=vo['lon_axis'])
+        vo['data'] = np.mean(vo['data'], axis=vo['lon_axis'])
         # vo['lon'] # shall it be averaged?
         return vo
+    return wrapper_decorator
+
+
+def compress_1d(func):
+    @functools.wraps(func)
+    def wrapper_decorator(*args, **kwargs):
+        compress_1d_ind = None
+        compress_1d_axis = None
+        if 'compress_1d_ind' in kwargs and 'compress_1d_axis' in kwargs:
+            compress_1d_ind = kwargs.pop('compress_1d_ind')
+            compress_1d_axis = kwargs.pop('compress_1d_axis')
+
+        vo = func(*args, **kwargs)
+
+        if compress_1d_axis is not None and compress_1d_ind is not None:
+            # if the pressure is 4d, compress it too
+            if vo['level'].shape[compress_1d_axis] == vo['data'].shape[compress_1d_axis]:
+                vo['level'] = np.compress(compress_1d_ind, vo['level'], compress_1d_axis)
+            vo['data'] = np.compress(compress_1d_ind, vo['data'], compress_1d_axis)
+        return vo
+
     return wrapper_decorator
 
 
@@ -102,14 +145,18 @@ def get_diag_template(model_vo, var_key, anomaly_wrt_vo=None, is_anomaly_relativ
     vo['data'] = model_vo[var_key]
     vo['lon'], vo['lat'] = model_vo['lon'], model_vo['lat']
     vo['time'] = model_vo['time']
+    vo['level'] = model_vo['p_rho']
 
     if anomaly_wrt_vo is not None:
         # data can have different temporal extent
         t_min = np.min((model_vo[var_key].shape[0], anomaly_wrt_vo[var_key].shape[0]))
         t_slice = slice(0, t_min)
 
+        if vo['level'].shape[0] == vo['data'].shape[0]:
+            vo['level'] = vo['level'][t_slice]
         vo['data'] = model_vo[var_key][t_slice] - anomaly_wrt_vo[var_key][t_slice]
         vo['time'] = vo['time'][t_slice]
+
         if is_anomaly_relative:
             vo['data'] /= anomaly_wrt_vo[var_key][t_slice]
 

@@ -7,7 +7,7 @@ import climpy.utils.grid_utils as grid
 import pandas as pd
 import matplotlib.pyplot as plt
 import climpy.utils.file_path_utils as fpu
-from climpy.utils.plotting_utils import save_figure_bundle, save_fig, get_JGR_full_page_width_inches
+from climpy.utils.plotting_utils import save_figure_bundle, save_figure, JGR_page_width_inches
 from scipy.constants import golden
 import argparse
 import os
@@ -130,7 +130,7 @@ print('Do time series plot')
 # Time series plot for each site individually
 for wrf_vo, aeronet_vo, dummy in zip(wrf_list, aeronet_list, stations.iterrows()):
     station = dummy[1]
-    fig = plt.figure(constrained_layout=True, figsize=(get_JGR_full_page_width_inches(), get_JGR_full_page_width_inches()/golden))
+    fig = plt.figure(constrained_layout=True, figsize=(JGR_page_width_inches(), JGR_page_width_inches() / golden))
     plt.plot(wrf_vo['time'], wrf_vo['data'], 'o', label='WRF, {}'.format(wrf_var_key))
     plt.plot(aeronet_vo['time'], aeronet_vo['data'], '*', label='Aeronet v{}, {}'.format(aod_level, aeronet_var_key))
     plt.ylabel('Optical depth, ()')
@@ -138,13 +138,13 @@ for wrf_vo, aeronet_vo, dummy in zip(wrf_list, aeronet_list, stations.iterrows()
     plt.legend()
     plt.title('Column AOD at {}'.format(station['Site_Name']))
     #save_figure_bundle(pics_output_folder + '/aeronet/', 'WRF-Aeronet AOD, {}'.format(station['Site_Name']))
-    save_fig(pics_output_folder + '/aeronet/by_site/', 'WRF-Aeronet AOD, {}.svg'.format(station['Site_Name']))
+    save_figure(pics_output_folder + '/aeronet/by_site/', 'WRF-Aeronet AOD, {}.svg'.format(station['Site_Name']))
     plt.close(fig)
 
 print('Do scatter plot')
 
 # Next, do the scatter plot
-plt.figure(constrained_layout=True, figsize=(get_JGR_full_page_width_inches(), get_JGR_full_page_width_inches()))
+plt.figure(constrained_layout=True, figsize=(JGR_page_width_inches(), JGR_page_width_inches()))
 plt.grid()
 plt.axis('equal')
 

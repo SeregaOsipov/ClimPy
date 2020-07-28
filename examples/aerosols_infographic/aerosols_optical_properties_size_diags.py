@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import datetime as dt
 import os
-from climpy.utils.plotting_utils import get_JGR_full_page_width_inches, save_figure_bundle
+from climpy.utils.plotting_utils import JGR_page_width_inches, save_figure_bundle
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
@@ -67,7 +67,7 @@ aod_cdf = get_cdf(mie_vo['qext'][0] * sd_vo['data'] * cross_section_area_transfo
 
 
 # DO THE PLOTTING
-fig = plt.figure(constrained_layout=True, figsize=(get_JGR_full_page_width_inches()*1.15, get_JGR_full_page_width_inches()))
+fig = plt.figure(constrained_layout=True, figsize=(JGR_page_width_inches() * 1.15, JGR_page_width_inches()))
 # fig = plt.figure(figsize=(get_JGR_full_page_width_inches()*1., get_JGR_full_page_width_inches()))
 gs = fig.add_gridspec(ncols=2, nrows=4, width_ratios=[1, 3], height_ratios=[3, 10, 10, 10])
 

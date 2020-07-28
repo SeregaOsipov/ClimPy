@@ -30,12 +30,13 @@ def j_o2_pp(matlab_output_vo):
     wavelengths = wavelengths[ind]
     spectral_actinic_flux = matlab_output_vo['spectral_actinic_flux'][ind]
 
-    spectral_j, matlab_output_vo['j_data_o2'] = compute_j(wavelengths, spectral_actinic_flux, xs_vo, qy_vo)
+    spectral_j, matlab_output_vo['j_o2'] = compute_j(wavelengths, spectral_actinic_flux, xs_vo, qy_vo)
     # daylight mean
-    matlab_output_vo['j_o2_mean'] = np.mean(matlab_output_vo['j_data_o2'], axis=2)
+    matlab_output_vo['j_o2_mean'] = np.mean(matlab_output_vo['j_o2'], axis=2)
+
 
 def j_o3_pp(matlab_output_vo):
-    xs_vo_o3 = parse_absorption_cross_section_file('O3_JPL-2010(2011)_293-298K_121.6-827.5nm(rec).txt')
+    o3_xs_vo = parse_absorption_cross_section_file('O3_JPL-2010(2011)_293-298K_121.6-827.5nm(rec).txt')
 
     wavelengths = matlab_output_vo['wl_grid']
     ind = np.ones(wavelengths.shape, dtype=bool)
@@ -44,13 +45,13 @@ def j_o3_pp(matlab_output_vo):
 
     qy_vo_o3 = get_ozone_quantum_yield(wavelengths, 253)
 
-    xs_vo = xs_vo_o3
+    xs_vo = o3_xs_vo
     qy_vo = qy_vo_o3
 
     spectral_actinic_flux = matlab_output_vo['spectral_actinic_flux'][ind]
-    spectral_j, matlab_output_vo['j_data_o3'] = compute_j(wavelengths, spectral_actinic_flux, xs_vo, qy_vo)
+    spectral_j, matlab_output_vo['j_o3'] = compute_j(wavelengths, spectral_actinic_flux, xs_vo, qy_vo)
     # compute daylight mean values as well
-    matlab_output_vo['j_o3_mean'] = np.mean(matlab_output_vo['j_data_o3'], axis=2)
+    matlab_output_vo['j_o3_mean'] = np.mean(matlab_output_vo['j_o3'], axis=2)
 
     # compute actinic flux in the ozone relevant band (O31P)
     # left boundary should be 193 nm, or even 0, but my calcs start at 200

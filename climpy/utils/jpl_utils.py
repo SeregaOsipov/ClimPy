@@ -17,7 +17,6 @@ def parse_absorption_cross_section_file(species_file_name):
     :return:
     """
 
-    # mpi_atlas_root_dir = os.path.expanduser('~') + '/Data/MPI/atlas/'
     mpi_atlas_root_dir = get_root_storage_path_on_hpc() + '/Data/MPI/atlas/'
 
     raw_data = np.genfromtxt(mpi_atlas_root_dir + 'xSection/' + species_file_name)

@@ -3,7 +3,7 @@ from climpy.utils.sparc_asap_sato_cmip_utils import prepare_sparc_asap_stratosph
     prepare_sparc_asap_vertically_resolved_data
 from climpy.utils.avhrr_utils import prepare_avhrr_aod
 from climpy.utils.climatology_utils import compute_daily_climatology
-from climpy.utils.plotting_utils import save_fig, save_figure_bundle
+from climpy.utils.plotting_utils import save_figure, save_figure_bundle
 import numpy as np
 import matplotlib.pyplot as plt
 import datetime as dt
@@ -131,7 +131,7 @@ def plot_asap_all_snapshots(var_name, var_column_index, contour_levels):
         plt.title(var_name + ', ' + time_data[time_index].strftime("%b, %Y"))
         plt.tight_layout()
 
-        save_fig(pics_output_folder + '/asap/' + var_name + '/', 'asap_' + '%02d' % (time_index) + '.png')
+        save_figure(pics_output_folder + '/asap/' + var_name + '/', 'asap_' + '%02d' % (time_index) + '.png')
 
 
 # column 1 is ext at 1020 nm
