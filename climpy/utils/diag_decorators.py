@@ -140,12 +140,42 @@ def data_statistics(func):
     return wrapper_decorator
 
 
+def lexical_preprocessor(func):
+    """'
+    This decorator helps to deal with cases, when you just want to get diag1+diag2 in one line
+    For example, Ox production + Ox destruction.
+    The decorator splits by + and loops over the keys.
+    """
+    @functools.wraps(func)
+    def wrapper_decorator(*args, **kwargs):
+        var_key = args[1]
+        if '+' in var_key:
+            print("Lexical preprocessor split {} into + keys {}".format(var_key, var_key.split('+')))
+            vos = []
+            total = 0
+            for key in var_key.split('+'):
+                # args[1] = key
+                # vo = func(*args, **kwargs)
+                vo = func(args[0], key, **kwargs)
+                vos.append(vo)
+                total += vo['data']
+            vo['data'] = total
+        else:
+            vo = func(*args, **kwargs)
+        return vo
+    return wrapper_decorator
+
+
+@lexical_preprocessor
 def get_diag_template(model_vo, var_key, anomaly_wrt_vo=None, is_anomaly_relative=False):
     vo = {}
     vo['data'] = model_vo[var_key]
     vo['lon'], vo['lat'] = model_vo['lon'], model_vo['lat']
     vo['time'] = model_vo['time']
     vo['level'] = model_vo['p_rho']
+
+    if var_key+'_units' in model_vo.keys():
+        vo['units'] = model_vo[var_key+'_units']
 
     if anomaly_wrt_vo is not None:
         # data can have different temporal extent

@@ -19,13 +19,13 @@ def save_figure_bundle(root_folder, file_name):
     Saves figure in 3 formats, png dpi 600, svg and pdf
     :return:
     """
-    save_figure(root_folder, file_name + '.png', dpi=600)
-    save_figure(root_folder, file_name + '.svg')
-    save_figure(root_folder, file_name + '.pdf')
+    save_figure(root_folder, file_name, file_ext='png', dpi=600)
+    save_figure(root_folder, file_name, file_ext='svg')
+    save_figure(root_folder, file_name, file_ext='pdf')
 
 
-def save_figure(root_folder, file_name, dpi=MY_DPI):
-    full_file_path = root_folder + file_name
+def save_figure(root_folder, file_name, file_ext='png', dpi=MY_DPI):
+    full_file_path = root_folder + file_name + '.' + file_ext
     dir_path = os.path.dirname(full_file_path)
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
