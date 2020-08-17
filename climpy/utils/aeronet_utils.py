@@ -272,8 +272,8 @@ def get_inversion_product(station, level, res):
     return aeronet_df
 
 
-def get_maritime_product(cruise, level, res):
-    aeronet_fp = get_maritime_file_path(cruise, level, res)
+def get_maritime_product(cruise, level, resolution):
+    aeronet_fp = get_maritime_file_path(cruise, level, resolution)
     aeronet_df = read_aeronet_maritime(aeronet_fp)
 
     return aeronet_df

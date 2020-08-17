@@ -31,7 +31,7 @@ def time_interval_selection(func):
                 # TODO: check that lat and lon are not time dependant
                 vo['lat'] = vo['lat'][ind]
                 vo['lon'] = vo['lon'][ind]
-            if vo['level'].shape[0] == vo['data'].shape[0]:
+            if 'level' in vo.keys() and vo['level'].shape[0] == vo['data'].shape[0]:
                 vo['level'] = vo['level'][ind]
             vo['data'] = vo['data'][ind]
             vo['time'] = vo['time'][ind]

@@ -3,7 +3,7 @@ import scipy as sp
 import scipy.special
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
-
+CHEM_106_AEROSOLS_KEYS = 'so4aj,so4ai,nh4aj,nh4ai,no3aj,no3ai,naaj,naai,claj,clai,orgaro1j,orgaro1i,orgaro2j,orgaro2i,orgalk1j,orgalk1i,orgole1j,orgole1i,orgba1j,orgba1i,orgba2j,orgba2i,orgba3j,orgba3i,orgba4j,orgba4i,orgpaj,orgpai,ecj,eci,p25j,p25i,antha,seas,soila'.split(',')
 MADE_MODES_SIGMA = (1.7, 2.0, 2.5)  # sginin, sginia, sginic # initial sigma-G for nuclei, acc, coarse modes
 
 
