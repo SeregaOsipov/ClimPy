@@ -2,55 +2,55 @@ import climpy.utils.mie_utils as mie
 import climpy.utils.aeronet_utils as aeronet
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import datetime as dt
 import os
 from climpy.utils.plotting_utils import JGR_page_width_inches, save_figure_bundle
+from climpy.utils.refractive_index_utils import get_dust_ri
+from climpy.utils.stats_utils import get_cdf
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
-from climpy.utils.stats_utils import get_cdf
-
 """
 https://github.com/SeregaOsipov/ClimPy/wiki/Aerosols-infographic
+
+This is the modified version of aerosols_optical_properties_size_diags.py
+Here, I use the dust size distribution data from KAUST Campus provided by Prof. Stenchikov
 """
 
-station = 'KAUST'
-# CASE 1: fine mode volume = coarse
-time_range = [dt.datetime(2012, 9, 28, 0, 0), dt.datetime(2012, 9, 29, 0, 0)]
-# CASE 2: coarse mode dominates = coarse
-time_range = [dt.datetime(2012, 9, 29, 0, 0), dt.datetime(2012, 9, 30, 0, 0)]
-res = aeronet.DAILY
-# get Aeronet refrative index
-ri_vo = aeronet.get_refractive_index('*{}*'.format(station), level=15, res=res, time_range=time_range)
+# get dust RI for Saudi
+ri_vo = get_dust_ri()
 # and size distribution
-sd_vo = aeronet.get_size_distribution('*{}*'.format(station), level=15, res=res, time_range=time_range)
+# Three cases:
+# 1. Aeronet SD at KAUST
+csv_fp = '../ClimPy/examples/aerosols_infographic/size_distribution_data/aeronet.csv'
+panel_annotation_lr = 'Aeronet station @ KAUST\n2014-2019 mean'
+file_name_postfix = 'KAUST Aeronet'
+# 2. Deposition sample (sieved)
+csv_fp = '../ClimPy/examples/aerosols_infographic/size_distribution_data/sieved.csv'
+panel_annotation_lr = 'Deposition samples @ KAUST\nSieved, 2016-2018 mean'
+file_name_postfix = 'KAUST sieved deposition'
+# 3. Deposition sample (unsieved)
+csv_fp = '../ClimPy/examples/aerosols_infographic/size_distribution_data/unsieved.csv'
+panel_annotation_lr = 'Deposition samples @ KAUST\nUnsieved, 2016-2018 mean'
+file_name_postfix = 'KAUST unsieved deposition'
+#NOTE: deposition samples were normalized somehow
+sd_df = pd.read_csv(csv_fp, usecols=[1, 2])
 
-# and AOD to verify Mie calculations
-aod443_vo = aeronet.get_aod_diag('*{}*'.format(station), 'AOD_443nm', level=15, res=res, time_range=time_range)
-aod532_vo = aeronet.get_aod_diag('*{}*'.format(station), 'AOD_532nm', level=15, res=res, time_range=time_range)
-aod667_vo = aeronet.get_aod_diag('*{}*'.format(station), 'AOD_667nm', level=15, res=res, time_range=time_range)
+wl_index = 2
 
-# drop the time dimension (only 1 month due to time range)
-time_ind = 0
-ri_vo['data'] = ri_vo['data'][time_ind]
-sd_vo['data'] = sd_vo['data'][time_ind]
-aod443_vo['data'] = aod443_vo['data'][time_ind]
-aod532_vo['data'] = aod532_vo['data'][time_ind]
-aod667_vo['data'] = aod667_vo['data'][time_ind]
+# Compute Mie extinction coefficients
+r_data = sd_df['radii'].to_numpy()
+mie_vo = mie.get_mie_efficiencies(ri_vo['ri'], r_data, ri_vo['wl'])
 
-# Compute AOD, first Mie extinction coefficients
-r_data = np.logspace(-3, 2, 100)  # um
-r_data = sd_vo['radii']  # actually use Aeronet reported radii
-mie_vo = mie.get_mie_efficiencies(ri_vo['data'], r_data, ri_vo['wl']/10**3)
 
-wl_index = 0
 cross_section_area_transform = 3/4 * r_data**-1
-od = np.trapz(mie_vo['qext'] * sd_vo['data'] * cross_section_area_transform, np.log(r_data), axis=1)
+od = np.trapz(mie_vo['qext'] * sd_df['dVdlnr'].to_numpy() * cross_section_area_transform, np.log(r_data), axis=1)
 
 # compute the CDFs for volume/mass and AOD
-volume_cdf = get_cdf(sd_vo['data'], np.log(r_data))
-area_cdf = get_cdf(sd_vo['data'] * cross_section_area_transform, np.log(r_data))
-aod_cdf = get_cdf(mie_vo['qext'][0] * sd_vo['data'] * cross_section_area_transform, np.log(r_data))
+volume_cdf = get_cdf(sd_df['dVdlnr'], np.log(r_data))
+area_cdf = get_cdf(sd_df['dVdlnr'] * cross_section_area_transform, np.log(r_data))
+aod_cdf = get_cdf(mie_vo['qext'][wl_index] * sd_df['dVdlnr'] * cross_section_area_transform, np.log(r_data))
 
 
 # DO THE PLOTTING
@@ -73,7 +73,7 @@ ax_text.axis('off')
 #r'\textcolor{red}{Today} '+
 
 ax_text = fig.add_subplot(gs[2, 0])
-ax_text.annotate('Extinction efficiency of each particle.\n\n$\lambda$ = 440 nm', (0.5, 0.5),
+ax_text.annotate('Extinction efficiency of each particle.\n\n$\lambda$ = {:3.0f} nm'.format(ri_vo['wl'][wl_index]*10**3), (0.5, 0.5),
                  xycoords='axes fraction', va='center', ha='center')
 ax_text.axis('off')
 
@@ -85,7 +85,7 @@ ax_text.axis('off')
 # the plots itself
 ax = fig.add_subplot(gs[1, 1])
 plt.sca(ax)
-plt.plot(sd_vo['radii'], sd_vo['data'], '-o', label='Volume')
+plt.plot(sd_df['radii'], sd_df['dVdlnr'], '-o', label='Volume')
 plt.xscale('log')
 # plt.xlabel('Radius, ($\mu m$)')
 plt.ylabel('dV/dlnr [$\mu m^3$ $\mu m^{-2}$]')
@@ -95,7 +95,7 @@ plt.title('Size distributions')
 color = 'tab:orange'
 ax2 = ax.twinx()
 ax2.tick_params(axis='y', labelcolor=color)
-plt.plot(sd_vo['radii'], sd_vo['data']*3/4*r_data**-1, '-o', color=color, label='Area')
+plt.plot(sd_df['radii'], sd_df['dVdlnr']*3/4*r_data**-1, '-o', color=color, label='Area')
 plt.ylabel('dA/dlnr [$\mu m^2$ $\mu m^{-2}$]', color=color)
 # plt.legend(loc='upper right')
 
@@ -127,9 +127,9 @@ plt.title('Mie $Q_{ext}$')
 ax = fig.add_subplot(gs[3, 1])
 plt.sca(ax)
 plt.grid()
-plt.plot(sd_vo['radii'], volume_cdf/volume_cdf[-1], '-o', label='Volume')
-plt.plot(sd_vo['radii'], area_cdf/area_cdf[-1], '-o', label='Area')
-plt.plot(sd_vo['radii'], aod_cdf/aod_cdf[-1], '-o', label='AOD')
+plt.plot(sd_df['radii'], volume_cdf/volume_cdf[-1], '-o', label='Volume')
+plt.plot(sd_df['radii'], area_cdf/area_cdf[-1], '-o', label='Area')
+plt.plot(sd_df['radii'], aod_cdf/aod_cdf[-1], '-o', label='AOD')
 plt.xscale('log')
 plt.xlabel('Radius, ($\mu m$)')
 plt.ylabel('CDF, ()')
@@ -137,9 +137,7 @@ plt.title('Cumulative distribution functions')  #  \n normalized to 1
 plt.legend()
 
 # text at the bottom
-date_str = time_range[0].strftime('%Y-%m-%d')
-plt.annotate('Aeronet station @ {} on {}'.format(station, date_str),
-             (0.99, 0.015), fontsize='x-small', xycoords='figure fraction', va='center', ha='right')
+plt.annotate(panel_annotation_lr, (0.99, 0.015), fontsize='x-small', xycoords='figure fraction', va='center', ha='right')
 url = 'https://github.com/SeregaOsipov/ClimPy/wiki/Aerosols-infographic'
 # have to create new axis because of the bug in constrained_layout
 ax_b = plt.axes((0.01, 0.015, 0.5, 0.05), facecolor='w')
@@ -147,4 +145,5 @@ ax_b.annotate('Sergey Osipov. Source {}'.format(url),
              (0.01, 0.015), fontsize='x-small', xycoords='figure fraction', va='center', ha='left')
 ax_b.axis('off')
 # plt.tight_layout()
-save_figure_bundle(os.path.expanduser('~') + '/Pictures/Papers/infographics/aerosols/', 'Aerosols size distribution and optical properties {}'.format(date_str))
+save_figure_bundle(os.path.expanduser('~') + '/Pictures/Papers/infographics/aerosols/',
+                   'Aerosols size distribution and optical properties, {}, wl={}'.format(file_name_postfix, ri_vo['wl'][wl_index]))
