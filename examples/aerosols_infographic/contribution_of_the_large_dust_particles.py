@@ -27,22 +27,21 @@ csv_fp = '../ClimPy/examples/aerosols_infographic/size_distribution_data/aeronet
 panel_annotation_lr = 'Aeronet station @ KAUST\n2014-2019 mean'
 file_name_postfix = 'KAUST Aeronet'
 # 2. Deposition sample (sieved)
-csv_fp = '../ClimPy/examples/aerosols_infographic/size_distribution_data/sieved.csv'
-panel_annotation_lr = 'Deposition samples @ KAUST\nSieved, 2016-2018 mean'
-file_name_postfix = 'KAUST sieved deposition'
+# csv_fp = '../ClimPy/examples/aerosols_infographic/size_distribution_data/sieved.csv'
+# panel_annotation_lr = 'Deposition samples @ KAUST\nSieved, 2016-2018 mean'
+# file_name_postfix = 'KAUST sieved deposition'
 # 3. Deposition sample (unsieved)
-csv_fp = '../ClimPy/examples/aerosols_infographic/size_distribution_data/unsieved.csv'
-panel_annotation_lr = 'Deposition samples @ KAUST\nUnsieved, 2016-2018 mean'
-file_name_postfix = 'KAUST unsieved deposition'
+# csv_fp = '../ClimPy/examples/aerosols_infographic/size_distribution_data/unsieved.csv'
+# panel_annotation_lr = 'Deposition samples @ KAUST\nUnsieved, 2016-2018 mean'
+# file_name_postfix = 'KAUST unsieved deposition'
 #NOTE: deposition samples were normalized somehow
 sd_df = pd.read_csv(csv_fp, usecols=[1, 2])
 
-wl_index = 2
+wl_index = 0
 
 # Compute Mie extinction coefficients
 r_data = sd_df['radii'].to_numpy()
 mie_vo = mie.get_mie_efficiencies(ri_vo['ri'], r_data, ri_vo['wl'])
-
 
 cross_section_area_transform = 3/4 * r_data**-1
 od = np.trapz(mie_vo['qext'] * sd_df['dVdlnr'].to_numpy() * cross_section_area_transform, np.log(r_data), axis=1)
@@ -70,7 +69,6 @@ ax_text.annotate('Area under the curves\n\nrepresents volume (mass) and \ncross 
                  (0.5, 0.5),
                  xycoords='axes fraction', va='center', ha='center')
 ax_text.axis('off')
-#r'\textcolor{red}{Today} '+
 
 ax_text = fig.add_subplot(gs[2, 0])
 ax_text.annotate('Extinction efficiency of each particle.\n\n$\lambda$ = {:3.0f} nm'.format(ri_vo['wl'][wl_index]*10**3), (0.5, 0.5),
@@ -94,7 +92,9 @@ plt.title('Size distributions')
 
 color = 'tab:orange'
 ax2 = ax.twinx()
-ax2.tick_params(axis='y', labelcolor=color)
+plt.sca(ax2)
+plt.xscale('log')
+plt.tick_params(axis='y', labelcolor=color)
 plt.plot(sd_df['radii'], sd_df['dVdlnr']*3/4*r_data**-1, '-o', color=color, label='Area')
 plt.ylabel('dA/dlnr [$\mu m^2$ $\mu m^{-2}$]', color=color)
 # plt.legend(loc='upper right')
@@ -141,8 +141,7 @@ plt.annotate(panel_annotation_lr, (0.99, 0.015), fontsize='x-small', xycoords='f
 url = 'https://github.com/SeregaOsipov/ClimPy/wiki/Aerosols-infographic'
 # have to create new axis because of the bug in constrained_layout
 ax_b = plt.axes((0.01, 0.015, 0.5, 0.05), facecolor='w')
-ax_b.annotate('Sergey Osipov. Source {}'.format(url),
-             (0.01, 0.015), fontsize='x-small', xycoords='figure fraction', va='center', ha='left')
+ax_b.annotate('{}'.format(url), (0.01, 0.015), fontsize='x-small', xycoords='figure fraction', va='center', ha='left')
 ax_b.axis('off')
 # plt.tight_layout()
 save_figure_bundle(os.path.expanduser('~') + '/Pictures/Papers/infographics/aerosols/',
