@@ -58,12 +58,22 @@ stations = aeronet.filter_available_stations(domain, time_range, aod_level)
 wrf_dir = os.path.dirname(wrf_file_path)
 print('Processing WRF out in {}'.format(wrf_dir))
 
+processes = []
 for index, station in stations.iterrows():
     print('\n\tProcessing {}\n'.format(station['Site_Name']))
     # ncks -v PH,PHB,nu0,ac0,corn,NU3,AC3,COR3,TAUAER3 -d XLONG,34.7822 -d XLAT,-30.855 infile.nc outfile.nc
     # cdo -P 16 remapnn,lon=39.1047/lat=22.3095 -select,name=TAUAER3,PH,PHB,nu0,ac0,corn,NU3,AC3,COR3 wrfout_d01_2017-*_00:00:00 ./pp_aeronet/wrfout_d01_
 
-    subprocess.run(['cdo', '-P', '2', 'remapnn,lon={}/lat={}'.format(station['Longitude(decimal_degrees)'], station['Latitude(decimal_degrees)']),
+    # .run is blocking
+    p = subprocess.Popen(['cdo', '-P', '2', 'remapnn,lon={}/lat={}'.format(station['Longitude(decimal_degrees)'], station['Latitude(decimal_degrees)']),
                     '-select,name=TAUAER3,ALT,PH,PHB,nu0,ac0,corn,NU3,AC3,COR3',
                     '{}/wrfout_d01_2017-*_00:00:00'.format(wrf_dir),
                     '{}/pp_aeronet/wrfout_d01_{}'.format(wrf_dir, station['Site_Name'])])
+    processes.append(p)
+
+print('Jobs submitted, waiting to finish')
+
+for p in processes:
+    p.communicate()
+
+print('DONE')
