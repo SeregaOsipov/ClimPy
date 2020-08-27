@@ -12,6 +12,7 @@ from climpy.utils.plotting_utils import save_figure_bundle, save_figure, JGR_pag
 from scipy.constants import golden
 import argparse
 import os
+from climpy.utils.wrf_chem_utils import CHEM_106_AEROSOLS_KEYS
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
@@ -66,7 +67,7 @@ for index, station in stations.iterrows():
 
     # .run is blocking
     p = subprocess.Popen(['cdo', '-P', '2', 'remapnn,lon={}/lat={}'.format(station['Longitude(decimal_degrees)'], station['Latitude(decimal_degrees)']),
-                    '-select,name=TAUAER3,ALT,PH,PHB,nu0,ac0,corn,NU3,AC3,COR3',
+                    '-select,name=TAUAER3,ALT,PH,PHB,nu0,ac0,corn,NU3,AC3,COR3,{}'.format(','.join(CHEM_106_AEROSOLS_KEYS)),
                     '{}/wrfout_d01_2017-*_00:00:00'.format(wrf_dir),
                     '{}/pp_aeronet/wrfout_d01_{}'.format(wrf_dir, station['Site_Name'])])
     processes.append(p)

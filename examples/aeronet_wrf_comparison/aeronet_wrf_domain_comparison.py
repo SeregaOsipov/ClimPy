@@ -16,8 +16,8 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 """
 This script plots WRF-Aeronet diagnostics within the WRF domain.
-This version is slow, it is better to do pp first (sample_wrf_output_at_aeronet_locations.py)
-and then plot using aeronet_wrf_domain_comparison_by_station.py
+This version is slow. Much faster approach is to extract data into separate netcdf at Aeronet locations first (sample_wrf_output_at_aeronet_locations.py)
+and then plot using aeronet_wrf_pp_comparison.py
 
 To run it from the bash, see list of input args below.
 
