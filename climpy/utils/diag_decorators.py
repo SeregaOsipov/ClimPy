@@ -4,6 +4,7 @@ import matplotlib
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
+
 def time_averaging(func):
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
@@ -20,6 +21,9 @@ def time_interval_selection(func):
         time_range = None
         if 'time_range' in kwargs:
             time_range = kwargs.pop('time_range')
+        time_dim = 0
+        if 'time_dim' in kwargs:
+            time_dim = kwargs.pop('time_dim')
 
         vo = func(*args, **kwargs)
 
@@ -33,7 +37,8 @@ def time_interval_selection(func):
                 vo['lon'] = vo['lon'][ind]
             if 'level' in vo.keys() and vo['level'].shape[0] == vo['data'].shape[0]:
                 vo['level'] = vo['level'][ind]
-            vo['data'] = vo['data'][ind]
+            # vo['data'] = vo['data'][ind]
+            vo['data'] = np.compress(ind, vo['data'], axis=time_dim)
             vo['time'] = vo['time'][ind]
         return vo
     return wrapper_decorator
@@ -193,7 +198,7 @@ def get_diag_template(model_vo, var_key, anomaly_wrt_vo=None, is_anomaly_relativ
     return vo
 
 
-def normalize_size_distribution(func):
+def normalize_size_distribution_by_point(func):
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
         sd_normalization_raduis = None  # wavelength for example 1 um
@@ -212,5 +217,47 @@ def normalize_size_distribution(func):
 
             scale = 1 / vo['data'][:, ind]  # first dimension is time, second radius
             vo['data'] *= scale[:, np.newaxis]
+        return vo
+    return wrapper_decorator
+
+
+def normalize_size_distribution_by_area(func):
+    '''
+    This decorator will normalize the area under the curve in the given range to 1
+
+    :param func:
+    :return:
+    '''
+
+    @functools.wraps(func)
+    def wrapper_decorator(*args, **kwargs):
+        normalization_diameters = None  # range of diameters for normalization, meters
+        diameter_dim = None
+        size_modes_dim = None
+        if 'normalization_diameters' in kwargs:
+            normalization_diameters = kwargs.pop('normalization_diameters')
+            diameter_dim = kwargs.pop('diameter_dim')
+        if 'size_modes_dim' in kwargs:
+            size_modes_dim = kwargs.pop('size_modes_dim')
+
+        vo = func(*args, **kwargs)
+
+        if normalization_diameters is not None:
+            dp = vo['radii'] * 2 * 10**-6  # m
+            dp = np.squeeze(dp)
+            ind = np.logical_and(dp >= normalization_diameters[0], dp <= normalization_diameters[1])
+            logdp = np.log(dp)
+
+            if size_modes_dim is not None:  # if modes (nu, acc, coarse) are stored separately
+                sd = np.sum(vo['data'], axis=size_modes_dim)
+            else:
+                sd = vo['data']
+
+            area = np.trapz(np.compress(ind, sd, axis=diameter_dim), logdp[ind], axis=diameter_dim)
+            vo['data'] /= np.expand_dims(area, axis=diameter_dim)
+
+            # check normalization
+            # np.trapz(vo['data'], logd, axis=1)
+            # np.trapz(np.mean(vo['data'], axis=0), logd)
         return vo
     return wrapper_decorator

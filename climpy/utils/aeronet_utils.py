@@ -7,7 +7,8 @@ import pandas as pd
 from shapely.geometry import Point
 from climpy.utils.file_path_utils import get_aeronet_file_path_root
 
-from climpy.utils.diag_decorators import time_interval_selection, normalize_size_distribution
+from climpy.utils.diag_decorators import time_interval_selection, normalize_size_distribution_by_point, \
+    normalize_size_distribution_by_area
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
@@ -293,9 +294,9 @@ def get_aod_diag(station, var_key, level, res):
 
     return vo
 
-
 @time_interval_selection
-@normalize_size_distribution
+@normalize_size_distribution_by_point
+@normalize_size_distribution_by_area
 def get_size_distribution(station, level, res):
     """
 

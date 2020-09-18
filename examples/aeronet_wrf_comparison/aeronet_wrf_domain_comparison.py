@@ -72,14 +72,7 @@ time_range = (wrf_time.min(), wrf_time.max())
 
 stations = aeronet.filter_available_stations(domain, time_range, aod_level)
 
-# plot the map with stations
-# WRF utils do not support MFDataset, just get any file
-nc_first = netCDF4.Dataset(nc._files[0])
-fig, ax = wrf_utils.plot_domain(nc_first)
-import cartopy.crs as crs
-ax.plot(stations['Longitude(decimal_degrees)'], stations['Latitude(decimal_degrees)'],
-         color='orange', marker='o', linewidth=0,
-         transform=crs.PlateCarree(),)
+plot_aeronet_stations_over_wrf_domain(nc._files[0], stations)
 save_figure_bundle(pics_output_folder + '/aeronet/', 'WRF domain and Aeronet stations maps')
 
 
