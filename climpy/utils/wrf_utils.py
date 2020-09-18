@@ -113,4 +113,3 @@ def generate_xarray_uniform_time_data(time_variable, td1=None, td2=None):
     rawTimeData = nc_utils.generate_netcdf_uniform_time_data(time_variable, td1, td2)
 
     return rawTimeData
-
