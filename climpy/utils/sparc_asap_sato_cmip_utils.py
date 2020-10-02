@@ -42,7 +42,7 @@ def prepare_sparc_asap_stratospheric_optical_depth():
     return vo
 
 
-def prepare_sparc_asap_vertically_resolved_data(is_filled=True):
+def prepare_sparc_asap_profile_data(is_filled=True):
     """
 
     :param is_filled:

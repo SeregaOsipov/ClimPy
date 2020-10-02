@@ -1,6 +1,6 @@
 from climpy.utils.file_path_utils import get_pictures_root_folder
 from climpy.utils.sparc_asap_sato_cmip_utils import prepare_sparc_asap_stratospheric_optical_depth, \
-    prepare_sparc_asap_vertically_resolved_data
+    prepare_sparc_asap_profile_data
 from climpy.utils.avhrr_utils import prepare_avhrr_aod
 from climpy.utils.climatology_utils import compute_daily_climatology
 from climpy.utils.plotting_utils import save_figure, save_figure_bundle
@@ -14,7 +14,7 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 pics_output_folder = get_pictures_root_folder() + '/Papers/PinatuboInitialStage/volcanic_data_sets_comparison/'
 
 sparc_od_vo = prepare_sparc_asap_stratospheric_optical_depth()
-sparc_ext_profile_filled_vo = prepare_sparc_asap_vertically_resolved_data(True)
+sparc_ext_profile_filled_vo = prepare_sparc_asap_profile_data(True)
 # sparc_profile_output_set_unfilled = prepare_sparc_asap_vertically_resolved_data(None, False)
 
 climatology_time_range_vo = TimeRangeVO(dt.datetime(1989, 1, 1), dt.datetime(1991, 1, 1))
