@@ -5,6 +5,8 @@ import functools
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
+from climpy.utils.diag_decorators import compress_1d
+
 CHEM_106_AEROSOLS_KEYS = 'so4aj,so4ai,nh4aj,nh4ai,no3aj,no3ai,naaj,naai,claj,clai,orgaro1j,orgaro1i,orgaro2j,orgaro2i,orgalk1j,orgalk1i,orgole1j,orgole1i,orgba1j,orgba1i,orgba2j,orgba2i,orgba3j,orgba3i,orgba4j,orgba4i,orgpaj,orgpai,ecj,eci,p25j,p25i,antha,seas,soila'.split(',')
 
 # !  initial mean diameter for nuclei mode, accumulation and coarse modes [ m ]
@@ -75,6 +77,23 @@ def get_WRF_MADE_modpar(moment0_list, moment3_list, sg_list):
     # dgacc[dgacc < dgmin] = dgmin
 
     return dg_list
+
+
+def get_wrf_sd_params(nc):
+    moment0_list = (nc['nu0'][:], nc['ac0'][:], nc['corn'][:])  # 0 moments
+    moment3_list = (nc['NU3'][:], nc['AC3'][:], nc['COR3'][:])  # 3rd moments
+
+    # Note: Apply inverse density (ALT) and convert from /kg-dryair to m^-3
+    inv_density = nc['ALT'][:]
+    moment0_list = [moment / inv_density for moment in moment0_list]
+    moment3_list = [moment / inv_density for moment in moment3_list]
+
+    # sg_list = MADE_MODES_SIGMA
+    sg_list = [np.ones(moment0_list[0].shape)*sg for sg in MADE_MODES_SIGMA]
+    # derive the median diameter
+    dg_list = get_WRF_MADE_modpar(moment0_list, moment3_list, sg_list)
+
+    return sg_list, dg_list, moment0_list, moment3_list
 
 
 def sample_WRF_MADE_size_distributions(dp, sg_list, dg_list, moment3_list, moment0_list):
@@ -223,6 +242,7 @@ def vstack_and_sort_aerosols(func):
 
         return diags_vstack, aerosols_keys
 
+
         # sort them, dims are species, time
         ind = np.argsort(np.nansum(diags_vstack, axis=1))
         # Reverse the sorted array
@@ -322,10 +342,10 @@ def get_aerosols_stack(nc, aerosols_keys, pm_sizes=None):
     V_factors = [default, default, default]
 
     if pm_sizes is not None:  # then compute the V factors for each aerosol type
-        sg_list, dg_list, moment0_list, moment3_list = aqaba.get_wrf_sd_params(nc)
+        sg_list, dg_list, moment0_list, moment3_list = get_wrf_sd_params(nc)
         d_min = pm_sizes[0]
         d_max = pm_sizes[1]
-        N_factors, V_factors = wrf_chem.compute_MADE_bounded_distribution_factors(d_min, d_max, sg_list, dg_list, moment3_list, moment0_list)
+        N_factors, V_factors = compute_MADE_bounded_distribution_factors(d_min, d_max, sg_list, dg_list, moment3_list, moment0_list)
 
     # get the mode index for each aerosol type
     MADE_mode_indices = define_MADE_modes_by_aerosol_type(aerosols_keys)
@@ -374,4 +394,5 @@ def rank_aerosols_contribution_to_the_mode(nc, aerosols_keys):
     # np.take_along_axis(diags_vstack, ind_3d, axis=1).shape
 
     return diags_vstack[ind], np.array(keys)[ind].tolist()
+
 

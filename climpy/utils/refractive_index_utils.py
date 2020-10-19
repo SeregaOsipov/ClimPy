@@ -3,6 +3,8 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 import netCDF4
 import numpy as np
 
+from climpy.utils.file_path_utils import get_root_storage_path_on_hpc
+
 
 def get_Williams_Palmer_refractive_index():
     '''
@@ -10,7 +12,7 @@ def get_Williams_Palmer_refractive_index():
     wavelength is in microns
     '''
 
-    nc_fp = '/home/osipovs/Data/Harvard/HITRAN/HITRAN2012/Aerosols/netcdf/palmer_williams_h2so4.nc'
+    nc_fp = get_root_storage_path_on_hpc() + '/Data/Harvard/HITRAN/HITRAN2012/Aerosols/netcdf/palmer_williams_h2so4.nc'
     nc = netCDF4.Dataset(nc_fp)
     wl = nc.variables['wavelength'][:]
     ri_real = nc.variables['rn'][3, :]  # index 4 is 75% solution

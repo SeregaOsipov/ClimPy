@@ -12,6 +12,8 @@ def datetime_to_timestamp(time_data):
 
 
 def average_time(time_data):
+    if time_data.size == 0:
+        return time_data
     timestamps = datetime_to_timestamp(time_data)
     average_date = dt.datetime.fromtimestamp(np.mean(timestamps))
     return average_date

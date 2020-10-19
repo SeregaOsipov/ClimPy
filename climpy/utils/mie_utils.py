@@ -8,8 +8,8 @@ def get_mie_efficiencies(ri, r_data, wavelength):
     """
 
     :param ri:
-    :param r_data:
-    :param wavelength:
+    :param r_data: units should be the same as wavelength
+    :param wavelength: units should be the same as radius
     :return:
     """
     # mp.mie can take x vector as input

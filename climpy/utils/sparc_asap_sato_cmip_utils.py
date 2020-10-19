@@ -1,14 +1,18 @@
+import copy
 import datetime as dt
 
 import netCDF4
 import numpy as np
 import glob
 
+from climpy.utils import mie_utils as mie
 from climpy.utils.file_path_utils import get_root_storage_path_on_hpc, convert_file_path_mask_to_list
 from natsort.natsort import natsorted
 from dateutil.relativedelta import relativedelta
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
+
+from climpy.utils.refractive_index_utils import get_Williams_Palmer_refractive_index
 
 
 def prepare_sparc_asap_stratospheric_optical_depth():
@@ -42,12 +46,13 @@ def prepare_sparc_asap_stratospheric_optical_depth():
     return vo
 
 
-def prepare_sparc_asap_profile_data(is_filled=True):
+def prepare_sparc_asap_profile_data(is_filled=True, filter_unphysical_data=True):
     """
 
     :param is_filled:
     :return: field 'data' contains extinction (not AOD)
     """
+
     if not is_filled:
         # when data is not filled, some of the lat bands are missing and has to be read in manually
         raise ValueError('is_filled=False is not implemented yet')
@@ -116,7 +121,64 @@ def prepare_sparc_asap_profile_data(is_filled=True):
     vo['lat'] = lat_data
     vo['lat_stag'] = lat_boundaries_data
 
+    vo['header1'] = header1
+    vo['header2'] = header2
+
+    # PP
+
+    # make the lat shape match the data shape
+    lat = vo['lat']
+    # replicate weight for each time snapshot
+    lat = np.repeat(lat[np.newaxis, :], vo['data'].shape[0], axis=0)
+    lat = np.repeat(lat[..., np.newaxis], vo['altitude'].shape[0], axis=-1)
+    vo['lat'] = lat
+
+    if filter_unphysical_data:
+        r_eff_ind = -7
+        r_eff = vo['data'][..., r_eff_ind]  # microns
+        # filter unrealistic values
+        ind = r_eff > 10 ** 2
+        r_eff[ind] = np.NaN
+        print('{} r_eff > 10**2 were removed'.format(np.sum(ind)))
+        ind = r_eff < 10 ** -2
+        r_eff[ind] = np.NaN
+        print('{} r_eff < 10**-2 were removed'.format(np.sum(ind)))
+        vo['data'][..., r_eff_ind] = r_eff
+
+        ext_1020 = vo['data'][..., 1] * 10 ** -3  # m^-1
+        # filter unrealistic values
+        ind = ext_1020 > 10 ** -2
+        ext_1020[ind] = np.NaN
+        print('{} ext_1020 > 10**-2 were removed'.format(np.sum(ind)))
+        vo['data'][..., 1] = ext_1020
+
+        #TODO filter 525 nm too
+        # ext_525 = sparc_profile_vo['data'][..., 5] * 10 ** -3  # m^-1
+
     return vo
+
+
+def disassemble_sparc_into_diags(sparc_profile_vo):
+    '''
+    var_index: 1 is 1020 nm ext, -7 is r_eff
+    '''
+
+    r_eff_vo = copy.deepcopy(sparc_profile_vo)
+    r_eff_vo['data'] = sparc_profile_vo['data'][..., -7]  # microns
+
+    ext_1020_vo = copy.deepcopy(sparc_profile_vo)
+    ext_1020_vo['data'] = sparc_profile_vo['data'][..., 1]  # microns
+
+    # ext_525_vo = copy.deepcopy(sparc_profile_vo)
+    # ext_525_vo['data'] = sparc_profile_vo['data'][..., 5]  # microns
+
+    # pp, derive column AOD
+    dz = 0.5 * 10**3  # m
+    aod_1020_vo = copy.deepcopy(sparc_profile_vo)
+    aod_1020_vo['data'] = np.nansum(sparc_profile_vo['data'][:, :, :, 1] * dz, axis=2)
+    aod_1020_vo['lat'] = sparc_profile_vo['lat'][:,:,0]
+
+    return r_eff_vo, ext_1020_vo, aod_1020_vo
 
 
 def prepare_sato_data():
@@ -167,3 +229,92 @@ def prepare_cmip6_data():
     vo['time'] = netCDF4.num2date(nc.variables['time'][:], nc.variables['time'].units)
 
     return vo
+
+
+def derive_sparc_so4_wet_mass(r_eff_vo, ext_1020_vo):
+    '''
+    Derive the SO4 mass that corresponds to the Effective radius and extinction at 1020 nm
+    The Mass is wet and corresponds to the 75% solution
+    '''
+
+    r_eff = r_eff_vo['data']  # microns
+    ext_1020 = ext_1020_vo['data']  # m^-1
+    dz = 0.5  # km
+
+    # internal grids
+    dp = np.logspace(-9, -4, 40)
+    r_data = dp/2  # m
+    wavelengths = np.array([0.525, 1.02])  # um
+
+    # Prepare RI
+    ri_vo = get_Williams_Palmer_refractive_index()
+    # interpolate RI onto internal wavelength grid
+    ri = np.interp(wavelengths, ri_vo['wl'][::-1], ri_vo['ri'][::-1])  # ri = real+1j*imag
+    ri_vo['ri'] = ri
+    ri_vo['wl'] = wavelengths
+
+    # Compute Mie extinction coefficients
+    mie_vo = mie.get_mie_efficiencies(ri_vo['ri'], r_data*10**6, ri_vo['wl'])
+
+    # check Mie
+    # plt.ion()
+    # plt.figure()
+    # plt.plot(mie_vo['r_data'], mie_vo['qext'][0], '-o')
+    # plt.ylabel('qext')
+    # plt.xscale('log')
+
+    # sample the SD
+    # sg, dg, moment3, moment0
+    sg = np.ones(r_eff.shape) * 1.8  # fix the parameter
+    # r_e = r_g * exp(5/2 ln(sg)^2)
+    dg = 2 * r_eff / np.exp(5/2*np.log(sg)**2)
+    dg *= 10**-6  # um -> m
+
+    # sample the SD, normalized to 1
+    # THIS one is faster then sp.stats.lognorm
+    dNdlogp = 1/((2*np.pi)**(1/2) * np.log(sg[..., np.newaxis])) * np.exp(-1/2 * (np.log(dp)-np.log(dg[..., np.newaxis]))**2 / np.log(sg[..., np.newaxis])**2)
+
+    # check SD
+    # time_ind = 80
+    # plt.ion()
+    # plt.figure()
+    # plt.plot(dp, dNdlogp[time_ind, 16, 45], '-o')
+    # plt.ylabel('qext')
+    # plt.xscale('log')
+
+    # Compute the OD
+    dNdlogr = dNdlogp/2
+    cross_section_area_transform = np.pi * r_data ** 2
+    ext = np.trapz(dNdlogr[..., np.newaxis, :] * cross_section_area_transform * mie_vo['qext'], np.log(r_data), axis=-1)
+    # ext *= 10**-18  # remember the units of the pdf (?, um) and cross section area (um^2)
+
+    # check OD
+    # plt.ion()
+    # plt.figure()
+    # plt.cla()
+    # x_coord = sparc_profile_vo['time']
+    # plt.plot(x_coord, ext[:, 16, 45, 1], '-o', label='Mie, unscalled')  # time, lat, alt, wl
+    # plt.plot(x_coord, ext_1020[:, 16, 45]*10**-7, '-*', label='SPARC ASAP 1020')  # time, lat, alt, wl
+    # # plt.plot(x_coord, moment0[:, 16, 45]*10**-21, '-*', label='moment0')
+    # plt.ylabel('Extinction')
+    # plt.yscale('log')
+    # plt.legend()
+
+    # scale the number of particles (m0) to match the OD in the dataset
+    moment0 = ext_1020 / ext[..., 1]  # number / m^3
+    # mk = m0 * dg**k * exp(k^2/2 ln(sg)^2)
+    moment3 = moment0 * dg**3 * np.exp(9/2*np.log(sg)**2)  # m^3 / m^3
+    # derive aerosol mass
+    earth_radius = 6371*10**3  # m
+    deg2m = 2*np.pi*earth_radius / 360  # about 111 km
+    dlat = 5 * deg2m * np.ones(moment3.shape[1:3])  # 5 is a lat step, # sparc_profile_vo['lat'][1:]-sparc_profile_vo['lat'][:-1]
+    dlon = 360 * deg2m * np.cos(np.deg2rad(ext_1020_vo['lat']))  # this is lon sum
+    dlon = dlon[0]
+    cell_volume = dlat*dlon*dz*10**3  # m^3
+    rho_so4 = 1800  # kg m^-3
+    mass = rho_so4 * np.pi/6 * moment3 * cell_volume  # kg
+
+    so4_mass_vo = copy.deepcopy(r_eff_vo)
+    so4_mass_vo['data'] = mass
+
+    return so4_mass_vo

@@ -5,10 +5,9 @@ import numpy as np
 import datetime as dt
 import os
 from climpy.utils.plotting_utils import JGR_page_width_inches, save_figure_bundle
+from climpy.utils.stats_utils import get_cdf
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
-
-from climpy.utils.stats_utils import get_cdf
 
 """
 https://github.com/SeregaOsipov/ClimPy/wiki/Aerosols-infographic

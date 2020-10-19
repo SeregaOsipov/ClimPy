@@ -22,7 +22,8 @@ This is purely to speed up the comparison later due to netcdf specifics
 '''
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--aeronet_in", help="Aeronet file path, which contains AOD and INV folders (download all)", required=True)
+parser.add_argument("--aeronet_in", help="Aeronet file path, which contains AOD and INV folders (download all)",
+                    required=False, default=fpu.get_aeronet_file_path_root())
 parser.add_argument("--wrf_in", help="WRF file path, for example, /storage/.../wrfout_d01_2017-*_00:00:00", required=True)
 parser.add_argument("--aod_level", help="Aeronet AOD level", default=15)
 # have to add those to make script Pycharm compatible
