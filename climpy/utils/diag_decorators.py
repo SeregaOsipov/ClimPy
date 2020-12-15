@@ -44,6 +44,22 @@ def time_interval_selection(func):
     return wrapper_decorator
 
 
+def pandas_time_interval_selection(func):
+    @functools.wraps(func)
+    def wrapper_decorator(*args, **kwargs):
+        time_range = None
+        if 'time_range' in kwargs:
+            time_range = kwargs.pop('time_range')
+
+        df = func(*args, **kwargs)
+
+        if time_range is not None:
+            ind = np.logical_and(df.index >= time_range[0], df.index <= time_range[1])
+            df = df.loc[ind]
+        return df
+    return wrapper_decorator
+
+
 def temporal_sampling(func):
     '''
     This decorator reduces the temporal sampling of the data
@@ -226,6 +242,7 @@ def normalize_size_distribution_by_area(func):
     This decorator will normalize the area under the curve in the given range to 1
 
     :param func:
+    :param normalization_diameters: [m]
     :return:
     '''
 

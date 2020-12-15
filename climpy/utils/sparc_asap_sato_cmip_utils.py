@@ -247,11 +247,7 @@ def derive_sparc_so4_wet_mass(r_eff_vo, ext_1020_vo):
     wavelengths = np.array([0.525, 1.02])  # um
 
     # Prepare RI
-    ri_vo = get_Williams_Palmer_refractive_index()
-    # interpolate RI onto internal wavelength grid
-    ri = np.interp(wavelengths, ri_vo['wl'][::-1], ri_vo['ri'][::-1])  # ri = real+1j*imag
-    ri_vo['ri'] = ri
-    ri_vo['wl'] = wavelengths
+    ri_vo = get_Williams_Palmer_refractive_index(wavelengths=wavelengths)
 
     # Compute Mie extinction coefficients
     mie_vo = mie.get_mie_efficiencies(ri_vo['ri'], r_data*10**6, ri_vo['wl'])

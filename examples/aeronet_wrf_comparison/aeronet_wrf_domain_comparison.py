@@ -7,7 +7,8 @@ import climpy.utils.grid_utils as grid
 import pandas as pd
 import matplotlib.pyplot as plt
 import climpy.utils.file_path_utils as fpu
-from climpy.utils.plotting_utils import save_figure_bundle, save_figure, JGR_page_width_inches
+from climpy.utils.plotting_utils import save_figure_bundle, save_figure, JGR_page_width_inches, \
+    plot_aeronet_stations_over_wrf_domain
 from scipy.constants import golden
 import argparse
 import os
@@ -16,11 +17,10 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 """
 This script plots WRF-Aeronet diagnostics within the WRF domain.
-This version is slow. Much faster approach is to extract data into separate netcdf at Aeronet locations first (sample_wrf_output_at_aeronet_locations.py)
+This version is slow. Much faster approach is to extract data into separate netcdf at Aeronet locations first (sample_wrf_output_at_aeronet_locations_v_all.py)
 and then plot using aeronet_wrf_pp_comparison.py
 
 To run it from the bash, see list of input args below.
-
 
 Example (one line for copy-paste):
 python aeronet_wrf_domain_comparison.py --aeronet_in='/work/mm0062/b302074//Data/NASA/Aeronet/' --wrf_in=/work/mm0062/b302074/Data/AirQuality/AQABA/chem_106/output/wrfout_d01_2017-0*_00:00:00 --diags_out=/work/mm0062/b302074//Pictures//Papers/AirQuality/AQABA/chem_106/ --aod_level=15

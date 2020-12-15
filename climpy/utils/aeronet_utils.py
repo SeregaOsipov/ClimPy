@@ -1,4 +1,5 @@
 import datetime as dt
+import urllib.request
 from datetime import datetime
 import numpy as np
 from dateutil import relativedelta
@@ -8,10 +9,9 @@ from shapely.geometry import Point
 from climpy.utils.file_path_utils import get_aeronet_file_path_root
 
 from climpy.utils.diag_decorators import time_interval_selection, normalize_size_distribution_by_point, \
-    normalize_size_distribution_by_area
+    normalize_size_distribution_by_area, pandas_time_interval_selection
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
-
 
 # station constants
 
@@ -61,6 +61,11 @@ def get_available_stations(time_range, aod_level):
     stations_soup = []
     for year in unique_years:
         stations_url = 'https://aeronet.gsfc.nasa.gov/Site_Lists_V3/aeronet_locations_v3_{}_lev{}.txt'.format(year, aod_level)
+        # compute nodes can not connect to internet, use local copy
+        try:
+            status_code = urllib.request.urlopen(stations_url).getcode()
+        except:  # if status_code != 200:
+            stations_url = DATA_FILE_PATH_ROOT + '/Site_Lists_V3/aeronet_locations_v3_{}_lev{}.txt'.format(year, aod_level)
         stations = pd.read_csv(stations_url, skiprows=1)
         # add year information
         stations['YEAR'] = pd.Series(year, index=stations.index)
@@ -115,6 +120,48 @@ def filter_available_stations(domain, time_range, aod_level):
     return stations_inside_domain
 
 
+def filter_available_stations_inside_wrf_domain(nc, time_range, aod_level):
+    """
+    Return list of stations within the domain and time interval
+
+    Take into account map distortion and first transform coordinates to PlateCarree
+    and then test if the stations are inside domain
+
+    :param domain:
+    :param time_range:
+    :param aod_level:
+    :return:
+    """
+    # list of stations, that have the temporal coverage
+    prelim_stations = get_available_stations(time_range, aod_level)
+
+    import wrf as wrf  # wrf-python library https://wrf-python.readthedocs.io/en/latest/
+    import cartopy.crs as crs
+    from shapely.geometry.polygon import Polygon
+
+    wrf_proj = wrf.get_cartopy(wrfin=nc)
+    proj = crs.PlateCarree()
+
+    geo_bounds = wrf.geo_bounds(wrfin=nc)
+    domain_points = [(geo_bounds.bottom_left.lon, geo_bounds.bottom_left.lat),
+              (geo_bounds.bottom_left.lon, geo_bounds.top_right.lat),
+              (geo_bounds.top_right.lon, geo_bounds.top_right.lat),
+              (geo_bounds.top_right.lon, geo_bounds.bottom_left.lat)]
+    pc_points = [proj.transform_point(point[0], point[1], wrf_proj) for point in domain_points]
+    domain = Polygon(pc_points)  # domain in the transoformed coordinates
+
+    # filter stations within the domain
+    stations_inside_domain = pd.DataFrame(columns=prelim_stations.columns)
+    for index, station in prelim_stations.iterrows():
+        # point = Point(station['Longitude(decimal_degrees)'], station['Latitude(decimal_degrees)'])
+        point = [station['Longitude(decimal_degrees)'], station['Latitude(decimal_degrees)']]
+        point = Point(proj.transform_point(point[0], point[1], wrf_proj))
+        if domain.contains(point):
+            stations_inside_domain = stations_inside_domain.append(station, ignore_index=True)
+
+    return stations_inside_domain
+
+
 def get_stations_file_path(station_mask, level, res, inv):
     '''
 
@@ -148,9 +195,9 @@ def get_station_file_path(station_mask, level, res, inv):
 
     files_list = get_stations_file_path(station_mask, level, res, inv)
     if len(files_list) > 1:
-        raise Exception('Aeronet: found more than one harbor that match {} in the {}'.format(station_mask))
+        raise Exception('Aeronet: found more than one harbor that match {}'.format(station_mask))  #  in the {}
     if len(files_list) == 0:
-        raise Exception('Aeronet: can not find harbor that match {} in the {}'.format(station_mask))
+        raise Exception('Aeronet: can not find harbor that match {}'.format(station_mask))
 
     return files_list[0]
 
@@ -259,6 +306,7 @@ def read_aeronet_maritime(aeronet_fp):
     return aeronet_df
 
 
+@pandas_time_interval_selection
 def get_aod_product(station, level, res):
     aeronet_fp = get_station_file_path(station, level, res, inv=False)
     aeronet_df = read_aeronet(aeronet_fp)
@@ -346,5 +394,33 @@ def get_refractive_index(station, level, res):
     vo['wl'] = np.array(wls)  # nm
 
     return vo
+
+
+# more complex stuff
+
+
+@pandas_time_interval_selection
+def derive_aod_from_size_distribution_using_mie(station, level, res):
+    """
+
+    """
+
+    # dVdlnr
+    sd_vo = get_size_distribution('*{}*'.format(station), level, res)
+
+    # TODO: RI should represent the true aerosol, for now use dust RI
+    from climpy.utils.refractive_index_utils import get_dust_ri
+    ri_vo = get_dust_ri()
+
+    import climpy.utils.mie_utils as mie
+    mie_vo = mie.get_mie_efficiencies(ri_vo['ri'], sd_vo['radii'], ri_vo['wl'])
+
+    cross_section_area_transform = 3 / 4 * sd_vo['radii'] ** -1
+    # dims: wl, r & time, r
+    od = np.trapz(mie_vo['qext'][:, np.newaxis, :] * sd_vo['data'][np.newaxis, :, :] * cross_section_area_transform[np.newaxis, np.newaxis, :], np.log(sd_vo['radii']), axis=-1)
+
+    df = pd.DataFrame(data=od.transpose(), columns=mie_vo['wavelength'], index=pd.DatetimeIndex(sd_vo['time']))
+
+    return df
 
 

@@ -51,6 +51,12 @@ volume_cdf = get_cdf(sd_df['dVdlnr'], np.log(r_data))
 area_cdf = get_cdf(sd_df['dVdlnr'] * cross_section_area_transform, np.log(r_data))
 aod_cdf = get_cdf(mie_vo['qext'][wl_index] * sd_df['dVdlnr'] * cross_section_area_transform, np.log(r_data))
 
+# radius setup
+x_coord = sd_df['radii']
+x_coord_label = 'Radius'
+# diameter setup
+x_coord = 2*sd_df['radii']
+x_coord_label = 'Diameter'
 
 # DO THE PLOTTING
 fig = plt.figure(constrained_layout=True, figsize=(JGR_page_width_inches() * 1.15, JGR_page_width_inches()))
@@ -83,9 +89,9 @@ ax_text.axis('off')
 # the plots itself
 ax = fig.add_subplot(gs[1, 1])
 plt.sca(ax)
-plt.plot(sd_df['radii'], sd_df['dVdlnr'], '-o', label='Volume')
+plt.plot(x_coord, sd_df['dVdlnr'], '-o', label='Volume')
 plt.xscale('log')
-# plt.xlabel('Radius, ($\mu m$)')
+# plt.xlabel('{}, ($\mu m$)'.format(x_coord_label))
 plt.ylabel('dV/dlnr [$\mu m^3$ $\mu m^{-2}$]')
 plt.title('Size distributions')
 # plt.legend(loc='upper left')
@@ -95,7 +101,7 @@ ax2 = ax.twinx()
 plt.sca(ax2)
 plt.xscale('log')
 plt.tick_params(axis='y', labelcolor=color)
-plt.plot(sd_df['radii'], sd_df['dVdlnr']*3/4*r_data**-1, '-o', color=color, label='Area')
+plt.plot(x_coord, sd_df['dVdlnr']*3/4*r_data**-1, '-o', color=color, label='Area')
 plt.ylabel('dA/dlnr [$\mu m^2$ $\mu m^{-2}$]', color=color)
 # plt.legend(loc='upper right')
 
@@ -118,20 +124,20 @@ ax2.legend(h1+h2, l1+l2, loc='upper right')
 
 ax = fig.add_subplot(gs[2, 1])
 plt.sca(ax)
-plt.plot(mie_vo['r_data'], mie_vo['qext'][wl_index], '-o')
+plt.plot(x_coord, mie_vo['qext'][wl_index], '-o')  # x_coord is sample the same as 2*mie_vo['r_data']
 plt.xscale('log')
-# plt.xlabel('Radius, ($\mu m$)')
+# plt.xlabel('{}, ($\mu m$)'.format(x_coord_label))
 plt.ylabel('Extinction coefficient, ()')
 plt.title('Mie $Q_{ext}$')
 
 ax = fig.add_subplot(gs[3, 1])
 plt.sca(ax)
 plt.grid()
-plt.plot(sd_df['radii'], volume_cdf/volume_cdf[-1], '-o', label='Volume')
-plt.plot(sd_df['radii'], area_cdf/area_cdf[-1], '-o', label='Area')
-plt.plot(sd_df['radii'], aod_cdf/aod_cdf[-1], '-o', label='AOD')
+plt.plot(x_coord, volume_cdf/volume_cdf[-1], '-o', label='Volume')
+plt.plot(x_coord, area_cdf/area_cdf[-1], '-o', label='Area')
+plt.plot(x_coord, aod_cdf/aod_cdf[-1], '-o', label='AOD')
 plt.xscale('log')
-plt.xlabel('Radius, ($\mu m$)')
+plt.xlabel('{}, ($\mu m$)'.format(x_coord_label))
 plt.ylabel('CDF, ()')
 plt.title('Cumulative distribution functions')  #  \n normalized to 1
 plt.legend()
@@ -144,5 +150,5 @@ ax_b = plt.axes((0.01, 0.015, 0.5, 0.05), facecolor='w')
 ax_b.annotate('{}'.format(url), (0.01, 0.015), fontsize='x-small', xycoords='figure fraction', va='center', ha='left')
 ax_b.axis('off')
 # plt.tight_layout()
-save_figure_bundle(os.path.expanduser('~') + '/Pictures/Papers/infographics/aerosols/',
+save_figure_bundle(get_root_storage_path_on_hpc() + '/Pictures/Papers/infographics/aerosols/{}/'.format(x_coord_label),
                    'Aerosols size distribution and optical properties, {}, wl={}'.format(file_name_postfix, ri_vo['wl'][wl_index]))
