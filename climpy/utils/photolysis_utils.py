@@ -55,14 +55,20 @@ def j_o3_pp(matlab_output_vo):
 
     # compute actinic flux in the ozone relevant band (O31P)
     # left boundary should be 193 nm, or even 0, but my calcs start at 200
-    matlab_output_vo['actinic_flux_200_340'] = integrate_spectral_flux(wavelengths, spectral_actinic_flux,
-                                                                       wl_min=0.200, wl_max=0.34)
+    # matlab_output_vo['actinic_flux_200_340'] = integrate_spectral_flux(wavelengths, spectral_actinic_flux,
+    #                                                                    wl_min=0.200, wl_max=0.34)
     # 220-306 is sensitivity test, this should have most of the qy=0.9
     matlab_output_vo['actinic_flux_220_306'] = integrate_spectral_flux(wavelengths, spectral_actinic_flux,
                                                                        wl_min=0.220, wl_max=0.306)
 
-    matlab_output_vo['actinic_flux_200_340_mean'] = np.mean(matlab_output_vo['actinic_flux_200_340'], axis=2)
+    # matlab_output_vo['actinic_flux_200_340_mean'] = np.mean(matlab_output_vo['actinic_flux_200_340'], axis=2)
     matlab_output_vo['actinic_flux_220_306_mean'] = np.mean(matlab_output_vo['actinic_flux_220_306'], axis=2)
+
+    # to debug and answer reviewer questions, compute up, down and diff separately
+    for key in ['actinic_flux', 'flux_dir_down', 'flux_diff_down', 'flux_up']:
+        spectral_flux = matlab_output_vo['spectral_{}'.format(key)][ind]
+        matlab_output_vo['{}_200_340'.format(key)] = integrate_spectral_flux(wavelengths, spectral_flux, wl_min=0.200, wl_max=0.34)
+        matlab_output_vo['{}_200_340_mean'.format(key)] = np.mean(matlab_output_vo['{}_200_340'.format(key)], axis=2)
 
 
 def compute_j(wavelengths, spectral_actinic_flux, xs_vo, qy_vo):

@@ -1,6 +1,8 @@
 import os as os
 from matplotlib import pyplot as plt
 import netCDF4
+import numpy as np
+
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 from climpy.utils import wrf_utils as wrf_utils
@@ -32,6 +34,16 @@ def save_figure(root_folder, file_name, file_ext='png', dpi=MY_DPI):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
     plt.savefig(full_file_path, dpi=dpi)
+
+
+def plot_y_x_on_scatter_plot(ax):
+    lims = [
+        np.min([ax.get_xlim(), ax.get_ylim()]),  # min of both axes
+        np.max([ax.get_xlim(), ax.get_ylim()]),  # max of both axes
+    ]
+    plt.plot(lims, lims, 'k-', zorder=0)
+    ax.set_xlim(lims)
+    ax.set_ylim(lims)
 
 
 def plot_aeronet_stations_over_wrf_domain(wrf_nc_file_path, stations):

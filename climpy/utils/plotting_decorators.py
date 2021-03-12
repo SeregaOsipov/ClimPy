@@ -16,3 +16,11 @@ def create_new_figure(func):
         vo = func(*args, **kwargs)
         return vo
     return wrapper_decorator
+
+
+# label the subplots for the publication
+def label_panels(axes):
+    for ax, label in zip(axes, ('A', 'B', 'C', 'D')):
+        ax.text(0.03, 0.97, label.lower(), transform=ax.transAxes,
+                bbox=dict(facecolor='white', edgecolor='k', alpha=0.85),
+                fontsize=16, va='top', zorder=10)  # fontweight='bold'

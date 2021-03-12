@@ -20,13 +20,14 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 '''
 This script will extract the variables for comparison at Aeronet locations
-This is purely to speed up the comparison later due to netcdf specifics
+This is purely to speed up the comparison later due to netcdf specifics 
 
-This version runs in parallel among all files but for each station, because python can not run on multiple nodes 
+This script is designed to work with single wrf input (not *)
+You have to merge pieces in the bash script
 '''
 
 # this is my defaults for debugging
-sim_version = 'chem_100_v4'
+sim_version = 'chem_100_v5'
 is_wrf_in_required = 'PYCHARM_HOSTED' not in os.environ.keys()
 
 parser = argparse.ArgumentParser()
@@ -34,6 +35,7 @@ parser.add_argument("--aeronet_in", help="Aeronet file path, which contains AOD 
                     required=False, default=fpu.get_aeronet_file_path_root())
 parser.add_argument("--wrf_in", help="WRF file path, for example, /storage/.../wrfout_d01_2017-*_00:00:00",
                     default=fpu.get_root_storage_path_on_hpc() + '/Data/AirQuality/AQABA/{}/output/wrfout_d01_2017-*_00:00:00'.format(sim_version),
+                    # default=fpu.get_root_storage_path_on_hpc() + '/Data/AirQuality/AQABA/{}/output/wrfout_d01_2017-07-01_00:00:00'.format(sim_version),
                     required=is_wrf_in_required)
 parser.add_argument("--aod_level", help="Aeronet AOD level", default=15)
 # have to add those to make script Pycharm compatible
@@ -64,46 +66,82 @@ stations = aeronet.filter_available_stations(domain, time_range, aod_level)
 wrf_dir = os.path.dirname(wrf_file_path)
 print('Processing WRF out in {}'.format(wrf_dir))
 
+# get wrf files
+wrf_in_paths = convert_file_path_mask_to_list(wrf_file_path)
+print('You should allocate {} CPUs, to accommodate to {} wrf files by {} stations'.format(len(wrf_in_paths), len(wrf_in_paths), len(stations)))
+
+# make log folder
+logs_dir = wrf_dir+'/pp_aeronet/logs/'
+if (not os.path.exists(logs_dir)):
+    os.makedirs(logs_dir)
+
+processes = []
+out_paths_by_station = []
 station = stations.iloc[0]
 for index, station in stations.iterrows():
     print('\n\tProcessing Aeronet station {}/{}: {}\n'.format(index, len(stations), station['Site_Name']))
 
-    # get wrf files
-    wrf_file_path = '{}/wrfout_d01_2017-*_00:00:00'.format(wrf_dir)
-    wrf_in_paths = convert_file_path_mask_to_list(wrf_file_path)
-
-    processes = []
-    wrf_out_paths = []
+    out_paths = []
     for file_index, wrf_in_path in zip(range(len(wrf_in_paths)), wrf_in_paths):
         print('\tProcessing WRF input {}/{}: {}'.format(file_index, len(wrf_in_paths), wrf_in_path))
 
         wrf_out_path = '{}/pp_aeronet/{}_{}'.format(wrf_dir, os.path.basename(wrf_in_path), station['Site_Name'])
-        wrf_out_paths.append(wrf_out_path)
+        out_paths.append(wrf_out_path)
 
         # ncks -v PH,PHB,nu0,ac0,corn,NU3,AC3,COR3,TAUAER3 -d XLONG,34.7822 -d XLAT,-30.855 infile.nc outfile.nc
         # cdo -P 16 remapnn,lon=39.1047/lat=22.3095 -select,name=TAUAER3,PH,PHB,nu0,ac0,corn,NU3,AC3,COR3 wrfout_d01_2017-*_00:00:00 ./pp_aeronet/wrfout_d01_
 
-        # .run is blocking
-        p = subprocess.Popen(['cdo', '-P', '1', 'remapnn,lon={}/lat={}'.format(station['Longitude(decimal_degrees)'], station['Latitude(decimal_degrees)']),
-                        '-select,name=TAUAER3,TAUAER4,ALT,PH,PHB,nu0,ac0,corn,NU3,AC3,COR3,{}'.format(','.join(CHEM_100_AEROSOLS_KEYS)),
-                        wrf_in_path,
-                        wrf_out_path])
-        processes.append(p)
+        with open("{}/log.{}".format(logs_dir, os.path.basename(wrf_out_path)), "wb") as out:
+            # this will allow running on multiple nodes AND balance the load
+            parallel_args = 'srun -N 1 -n 1 --hint=nomultithread --cpus-per-task=1 --exclusive'.split(' ')
+            p = subprocess.Popen(parallel_args + ['cdo', '-P', '1',
+                                 'remapnn,lon={}/lat={}'.format(station['Longitude(decimal_degrees)'], station['Latitude(decimal_degrees)']),
+                                 '-select,name=TAUAER3,TAUAER4,ALT,PH,PHB,nu0,ac0,corn,NU3,AC3,COR3,H2OAI,H2OAJ,{}'.format(','.join(CHEM_100_AEROSOLS_KEYS)),
+                                 wrf_in_path, wrf_out_path],
+                                 stdout=out, stderr=out)
+            processes.append(p)
 
-    print('cdo remapnn submitted, waiting to finish')
-    for p in processes:
-        p.communicate()
+    out_paths_by_station.append(out_paths)  # group by stations
 
-    # merge in time
-    base_name = os.path.basename(wrf_out_paths[0])
-    merged_wrf_out_path = '{}/pp_aeronet/{}_{}'.format(wrf_dir, base_name[0:10], station['Site_Name'])
-    p = subprocess.Popen(['cdo', '-P', '8', 'mergetime', ' '.join(wrf_out_paths), merged_wrf_out_path])
+
+print('Jobs submitted, waiting to finish')
+
+
+for p in processes:
     p.communicate()
 
-    # remove temp files
-    for path in wrf_out_paths:
+
+print('\nDONE remapnn, proceed merge\n')
+
+
+processes = []
+for out_paths, dummy in zip(out_paths_by_station, stations.iterrows()):
+    station = dummy[1]
+    print('\n\tProcessing Aeronet station {}/{}: {}\n'.format(index, len(stations), station['Site_Name']))
+
+    base_name = os.path.basename(out_paths[0])
+    wrf_out_path = '{}/pp_aeronet/{}_{}'.format(wrf_dir, base_name[0:10], station['Site_Name'])
+    p = subprocess.Popen(['cdo', '-P', '8', 'mergetime', ' '.join(out_paths), wrf_out_path])
+    processes.append(p)
+
+
+print('Jobs submitted, waiting to finish')
+
+
+for p in processes:
+    p.communicate()
+
+
+print('DONE cdo merge, remove temp files')
+for out_paths in out_paths_by_station:
+    for path in out_paths:
         print('Removing {}'.format(path))
         os.remove(path)
 
+
+print('DONE removing')
+
+
+print('You should allocate {}x{}={} CPUs'.format(len(stations), len(out_paths), len(stations)*len(out_paths)))
 print('DONE')
 
