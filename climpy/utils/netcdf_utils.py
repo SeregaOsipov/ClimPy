@@ -1,7 +1,7 @@
-__author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
-
 import netCDF4
 import numpy as np
+
+__author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 
 def generate_netcdf_uniform_time_data(time_variable, td1=None, td2=None):

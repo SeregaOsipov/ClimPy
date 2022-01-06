@@ -278,3 +278,23 @@ def normalize_size_distribution_by_area(func):
             # np.trapz(np.mean(vo['data'], axis=0), logd)
         return vo
     return wrapper_decorator
+
+
+def derive_size_distribution_moment(func):
+    @functools.wraps(func)
+    def wrapper_decorator(*args, **kwargs):
+        moment = None  # 'dN' by default
+        if 'moment' in kwargs:
+            moment = kwargs.pop('moment')
+
+        vo = func(*args, **kwargs)
+
+        if moment is not None:
+            if moment == 'dV':  # compute dV from dN
+                vo['data'] *= 4 / 3 * np.pi * vo['radii'] ** 3  # *= um**3
+            if moment == 'dA':  # compute dA from dN, geometric cross-section (not surface area)
+                vo['data'] *= np.pi * vo['radii'] ** 2  # *= um**2
+            if moment == 'dS':  # compute dS from dN, surface area (not geometric cross-section)
+                vo['data'] *= 4 * np.pi * vo['radii'] ** 2  # *= um**2
+        return vo
+    return wrapper_decorator

@@ -1,11 +1,9 @@
 import numpy as np
 from climpy.utils.jpl_utils import parse_absorption_cross_section_file
+from climpy.utils.atmos_chem_utils import get_ozone_quantum_yield
+from climpy.utils.radiation_utils import get_photon_energy, integrate_spectral_flux
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
-
-from climpy.utils.quantum_yeild_utils import get_ozone_quantum_yield
-
-from climpy.utils.radiation_utils import get_photon_energy, integrate_spectral_flux
 
 """
 This module contains the routines, which I often use for ozone chemistry analysis
@@ -72,20 +70,21 @@ def j_o3_pp(matlab_output_vo):
 
 
 def compute_j(wavelengths, spectral_actinic_flux, xs_vo, qy_vo):
-    # units are W *m^-2 * um^-1  = J * s^-1 *m^-2 *um^-1
-    E = get_photon_energy(wavelengths * 10**-6)
-    # this will produce units of photons * cm^-2 * um^-1 * s^-1
-    spectral_actinic_flux = spectral_actinic_flux / E[:, np.newaxis, np.newaxis, np.newaxis] * 10**-4
+    '''
+    :param wavelengths: [um]
+    :param spectral_actinic_flux: [W *m^-2 * um^-1]
+    :return: units are s^-1
+    '''
+    E = get_photon_energy(wavelengths * 10**-6)  # J = W*s
+    spectral_actinic_flux = spectral_actinic_flux / E * 10**-4  # this will produce units of photons * cm^-2 * um^-1 * s^-1
 
     # abs xsection and q for O2 are rather smooth, interpolate them onto the actinic flux wavelengths
     abs_xsection = np.interp(wavelengths, xs_vo['wavelengths'], xs_vo['abs_xsection'], left=np.NaN, right=np.NaN)
     quantum_yield = np.interp(wavelengths, qy_vo['wavelengths'], qy_vo['quantum_yield'], left=np.NaN, right=np.NaN)
 
-    # units are cm^2 * molecule^-1     *  cm^-2*um^-1^s^-1 =    um^-1*s^-1*molecule^-1
     abs_times_qy = abs_xsection * quantum_yield
-    spectral_j = spectral_actinic_flux * abs_times_qy[:, np.newaxis, np.newaxis, np.newaxis]
-    # units are s^-1 * molecule^-1
-    j = np.trapz(spectral_j, wavelengths, axis=0)
+    spectral_j = spectral_actinic_flux * abs_times_qy  # units are cm^2 * molecule^-1     *  cm^-2*um^-1^s^-1 =    um^-1*s^-1*molecule^-1
+    j = np.trapz(spectral_j, wavelengths, axis=-1)  # # units are s^-1 * molecule^-1
     return spectral_j, j
 
 

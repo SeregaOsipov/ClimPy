@@ -1,10 +1,13 @@
-__author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
-
 import numpy as np
 import scipy as sp
 import scipy.special
+
+from climpy.utils.diag_decorators import time_interval_selection, normalize_size_distribution_by_point, derive_size_distribution_moment
+from climpy.utils.netcdf_utils import convert_time_data_impl
 from climpy.utils.wrf_chem_utils import get_aerosols_keys, get_molecule_key_from_aerosol_key, to_stp, vstack_and_sort_aerosols, combine_aerosol_types, \
     combine_aerosol_modes
+
+__author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 """
 MADE specific utils
@@ -12,16 +15,9 @@ MADE specific utils
 
 
 # !  initial mean diameter for nuclei mode, accumulation and coarse modes [ m ]
-#       PARAMETER (dginin=0.01E-6)
-#       PARAMETER (dginia=0.07E-6)
-#       PARAMETER (dginic=1.0E-6)
 MADE_MODES_DGs = [0.01E-6, 0.07E-6, 1.0E-6]
-
 # !  initial sigma-G for nuclei, acc, and coarse modes
-#       PARAMETER (sginin=1.70)
-#       PARAMETER (sginia=2.00)
-#       PARAMETER (sginic=2.5)
-MADE_MODES_SIGMA = [1.7, 2.0, 2.5]
+MADE_MODES_SIGMA = [1.7, 2.0, 2.5]  #       PARAMETER (sginin=1.70)
 
 # this one was ported from MADE/VBS module_data_soa_vbs.F
 # this are the values used in chem_opt=100 (used in the *fac, i.e. orgfac or no3fac)
@@ -197,6 +193,12 @@ def get_wrf_sd_params(nc):
         if np.sum(ind) > 0:
             raise Exception('m0 or m3 has {} nan values and there should none'.format(np.sum(ind)))
 
+    # if sgs[0].ndim > 3:  # due to memory restrictions, convert float64 to float16
+    #     sgs = [item.astype(np.float16) for item in sgs]
+    #     dgs = [item.astype(np.float16) for item in dgs]
+    #     m0s = [item.astype(np.float16) for item in m0s]
+    #     m3s = [item.astype(np.float16) for item in m3s]
+
     return sgs, dgs, m0s, m3s
 
 
@@ -240,9 +242,7 @@ def sample_WRF_MADE_size_distributions(dp, sgs, dgs, m0s, m3s):
 
     dNdlogds = ()  # list of dNdlogd by mode
     for sg, dg, m0, m3 in zip(sgs, dgs, m0s, m3s):
-
-        # if sg/dg... are numbers, then convert them to arrays
-        if isinstance(sg, float):
+        if isinstance(sg, float):  # # if sg/dg... are numbers, then convert them to arrays
             sg = np.array(sg)
             dg = np.array(dg)
             m0 = np.array(m0)
@@ -419,3 +419,58 @@ def rank_aerosols_contribution_to_the_mode(nc, aerosols_keys):
     # np.take_along_axis(diags_vstack, ind_3d, axis=1).shape
 
     return diags_vstack[ind], np.array(keys)[ind].tolist()
+
+
+@time_interval_selection
+# @geo_regions_time_averaging
+@normalize_size_distribution_by_point
+@derive_size_distribution_moment
+def get_wrf_size_distribution_by_modes(nc, sum_up_modes=False, column=False, r_grid_to_merge=None, derive_m3=False, chem_opt=None):  # , wet=True
+    '''
+    :param nc:
+    :param r_grid_to_merge: additional sampling points, [m]
+    :return: original dNdlogr has units [part / m^3], this can be modified by
+    decorator derive_size_distribution_moment
+    '''
+
+    sgs, dgs, m0s, m3s = get_wrf_sd_params(nc)  # size distribution parameters
+    if derive_m3:  # derive m3 from individual components instead of the direct output
+        m3s = derive_m3s_from_mass_concentrations(nc, chem_opt, wet=False)
+
+    dp = np.logspace(-9, -4, 40)  # sample the distribution  # dp = np.logspace(-9, -4, 100)
+    # TODO: move these to r_grid_to_merge
+    # add Aeronet and Drewnick radii for normalization
+    # dp = np.append(dp, 2*AERONET_NORMALIZATION_RADUIS * 10 ** -6)
+    # dp = np.append(dp, 2*DREWNICK_NORMALIZATION_RADUIS * 10 ** -6)
+    if r_grid_to_merge is not None:
+        dp = np.append(dp, r_grid_to_merge*2)
+    dp.sort()
+
+    radii = dp / 2
+    dNdlogp_list = sample_WRF_MADE_size_distributions(dp, sgs, dgs, m0s, m3s)
+
+    vo = {}
+    vo['data'] = np.array(dNdlogp_list)  # this SD will be total
+    vo['radii'] = radii * 10 ** 6  # um
+
+    time_key = 'time'
+    if time_key not in nc.variables.keys():
+        time_key = 'XTIME'
+    vo['time'] = convert_time_data_impl(nc.variables[time_key][:], nc.variables[time_key].units)
+
+    if isinstance(vo['time'], np.ma.masked_array):
+        vo['time'] = vo['time'].filled()  # prevent time being masked array
+
+    # Aux stuff
+    if sum_up_modes:
+        vo['data'] = np.sum(vo['data'], axis=0)
+
+    if column:  # integrate vertically
+        z_stag = nc['PH'][:] + nc['PHB'][:] / 9.8
+        dz = np.diff(z_stag, axis=1)  # m
+        z_dim = vo['data'].shape.index(nc.dimensions['bottom_top'].size)  # deduce z_dim index
+        vo['data'] = np.sum(vo['data'] * dz[..., np.newaxis], axis=z_dim)
+        # TODO: do not change units here
+        vo['data'] *= 10 ** -12  # particles * um**3 / um**2  # convert units: WRF [part * um^3 / m^3 * m] to Aeronet [um^3/um^2]
+
+    return vo

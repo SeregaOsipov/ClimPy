@@ -6,13 +6,13 @@ import numpy as np
 def get_photon_energy(wavelengths):
     """
     computes the energy of the photon of a given wavelength
-    :param wavelengths: [um]
-    :return: units are W *m^-2 * um^-1  = J * s^-1 *m^-2 *um^-1
+    :param wavelengths: [m]
+    :return: J = W*s
     """
     plank_constant = 6.62606957 * 10**-34  # J*s
     speed_of_light = 299792458  # m*s^-1
     nu = speed_of_light / wavelengths  # s^-1
-    E = plank_constant * nu  # J
+    E = plank_constant * nu  # J = W*s
     return E
 
 

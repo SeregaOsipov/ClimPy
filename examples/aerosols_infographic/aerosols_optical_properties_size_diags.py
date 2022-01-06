@@ -37,19 +37,34 @@ aod443_vo['data'] = aod443_vo['data'][time_ind]
 aod532_vo['data'] = aod532_vo['data'][time_ind]
 aod667_vo['data'] = aod667_vo['data'][time_ind]
 
+#
+# add 0.6 wl
+wls = np.sort(np.append(ri_vo['wl'], [500,]))
+ri = np.interp(wls, ri_vo['wl'], ri_vo['data'])
+ri_vo['data'] = ri
+ri_vo['wl'] = wls
+
 # Compute AOD, first Mie extinction coefficients
 r_data = np.logspace(-3, 2, 100)  # um
 r_data = sd_vo['radii']  # actually use Aeronet reported radii
 mie_vo = mie.get_mie_efficiencies(ri_vo['data'], r_data, ri_vo['wl']/10**3)
 
-wl_index = 0
+wl_index = 1
 cross_section_area_transform = 3/4 * r_data**-1
 od = np.trapz(mie_vo['qext'] * sd_vo['data'] * cross_section_area_transform, np.log(r_data), axis=1)
 
 # compute the CDFs for volume/mass and AOD
 volume_cdf = get_cdf(sd_vo['data'], np.log(r_data))
 area_cdf = get_cdf(sd_vo['data'] * cross_section_area_transform, np.log(r_data))
-aod_cdf = get_cdf(mie_vo['qext'][0] * sd_vo['data'] * cross_section_area_transform, np.log(r_data))
+aod_cdf = get_cdf(mie_vo['qext'][wl_index] * sd_vo['data'] * cross_section_area_transform, np.log(r_data))
+
+
+# radius setup
+x_coord = sd_vo['radii']
+x_coord_label = 'Radius'
+# diameter setup
+x_coord = 2*sd_vo['radii']
+x_coord_label = 'Diameter'
 
 
 # DO THE PLOTTING
@@ -72,19 +87,19 @@ ax_text.axis('off')
 #r'\textcolor{red}{Today} '+
 
 ax_text = fig.add_subplot(gs[2, 0])
-ax_text.annotate('Extinction efficiency of each particle.\n\n$\lambda$ = 440 nm', (0.5, 0.5),
+ax_text.annotate('Extinction efficiency of each particle.\n\n$\lambda$ = {:.0f} nm'.format(ri_vo['wl'][wl_index]), (0.5, 0.5),
                  xycoords='axes fraction', va='center', ha='center')
 ax_text.axis('off')
 
 ax_text = fig.add_subplot(gs[3, 0])
-ax_text.annotate('Contribution of particles that are <= r.\n\nNormalized to 1.', (0.5, 0.5),
+ax_text.annotate('Contribution of particles that are $\leq$ d.\n\nNormalized to 1.', (0.5, 0.5),
                  xycoords='axes fraction', va='center', ha='center')
 ax_text.axis('off')
 
 # the plots itself
 ax = fig.add_subplot(gs[1, 1])
 plt.sca(ax)
-plt.plot(sd_vo['radii'], sd_vo['data'], '-o', label='Volume')
+plt.plot(x_coord, sd_vo['data'], '-o', label='Volume')
 plt.xscale('log')
 # plt.xlabel('Radius, ($\mu m$)')
 plt.ylabel('dV/dlnr [$\mu m^3$ $\mu m^{-2}$]')
@@ -94,7 +109,7 @@ plt.title('Size distributions')
 color = 'tab:orange'
 ax2 = ax.twinx()
 ax2.tick_params(axis='y', labelcolor=color)
-plt.plot(sd_vo['radii'], sd_vo['data']*3/4*r_data**-1, '-o', color=color, label='Area')
+plt.plot(x_coord, sd_vo['data']*3/4*r_data**-1, '-o', color=color, label='Area')
 plt.ylabel('dA/dlnr [$\mu m^2$ $\mu m^{-2}$]', color=color)
 # plt.legend(loc='upper right')
 
@@ -117,7 +132,7 @@ ax2.legend(h1+h2, l1+l2, loc='upper right')
 
 ax = fig.add_subplot(gs[2, 1])
 plt.sca(ax)
-plt.plot(mie_vo['r_data'], mie_vo['qext'][wl_index], '-o')
+plt.plot(x_coord, mie_vo['qext'][wl_index], '-o')
 plt.xscale('log')
 # plt.xlabel('Radius, ($\mu m$)')
 plt.ylabel('Extinction coefficient, ()')
@@ -126,11 +141,12 @@ plt.title('Mie $Q_{ext}$')
 ax = fig.add_subplot(gs[3, 1])
 plt.sca(ax)
 plt.grid()
-plt.plot(sd_vo['radii'], volume_cdf/volume_cdf[-1], '-o', label='Volume')
-plt.plot(sd_vo['radii'], area_cdf/area_cdf[-1], '-o', label='Area')
-plt.plot(sd_vo['radii'], aod_cdf/aod_cdf[-1], '-o', label='AOD')
+plt.plot(x_coord, volume_cdf/volume_cdf[-1], '-o', label='Volume')
+plt.plot(x_coord, area_cdf/area_cdf[-1], '-o', label='Area')
+plt.plot(x_coord, aod_cdf/aod_cdf[-1], '-o', label='AOD')
 plt.xscale('log')
-plt.xlabel('Radius, ($\mu m$)')
+# plt.xlabel('Radius, ($\mu m$)')
+plt.xlabel('{}, ($\mu m$)'.format(x_coord_label))
 plt.ylabel('CDF, ()')
 plt.title('Cumulative distribution functions')  #  \n normalized to 1
 plt.legend()
@@ -146,4 +162,6 @@ ax_b.annotate('Sergey Osipov. Source {}'.format(url),
              (0.01, 0.015), fontsize='x-small', xycoords='figure fraction', va='center', ha='left')
 ax_b.axis('off')
 # plt.tight_layout()
-save_figure_bundle(os.path.expanduser('~') + '/Pictures/Papers/infographics/aerosols/', 'Aerosols size distribution and optical properties {}'.format(date_str))
+file_name_postfix = 'Aeronet KAUST'
+save_figure_bundle(os.path.expanduser('~') + '/Pictures/Papers/infographics/aerosols/{}/'.format(x_coord_label),
+                   'Aerosols size distribution and optical properties, {}, wl={}'.format(file_name_postfix, ri_vo['wl'][wl_index]))

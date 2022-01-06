@@ -7,7 +7,7 @@ def get_ozone_quantum_yield(wavelengths, temperature):
     """
 
     :param wavelengths: in microns
-    :param temperature:
+    :param temperature: in Kelvin
     :return:
     """
     wavelengths_nm = wavelengths * 10 ** 3

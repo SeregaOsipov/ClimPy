@@ -35,13 +35,13 @@ def air_mass_density(p, t):
     return air_rho
 
 
-def convert_vmr_to_dobson_units(p, t, dz, gas_ppmv, z_dim_axis=0):
+def compute_column_from_vmr_profile(p, t, dz, gas_ppmv, z_dim_axis=0, in_DU=True):
     """
-    Computes for a given gas profile the column loading in Dobson Units (DU)
+    Computes for a given gas profile the column loading (by default in Dobson Units (DU))
     :param p: in Pa
     :param t: in K (regular,  not potential!)
     :param dz: in meters (derived from z_stag)
-    :param gas_ppmv:
+    :param gas_ppmv: gas profile in units of ppmv
     :param z_dim_axis:
     :return:
     """
@@ -50,21 +50,23 @@ def convert_vmr_to_dobson_units(p, t, dz, gas_ppmv, z_dim_axis=0):
     n_air = air_number_density(p, t)  # molecules / m^3
     gas_number_density = gas_ppmv * 10**-6 * n_air  # molecules / m**3
 
-    gas_dobson_units = convert_nd_to_dobson_units(dz, gas_number_density, z_dim_axis)
+    gas_dobson_units = compute_column_from_nd_profile(dz, gas_number_density, z_dim_axis, in_DU)
     return gas_dobson_units
 
 
-def convert_nd_to_dobson_units(dz, gas_number_density, z_dim_axis=0):
+def compute_column_from_nd_profile(dz, gas_number_density, z_dim_axis=0, in_DU=True):
     """
-    Computes for a given gas profile the column loading in Dobson Units (DU)
+    Computes for a given gas profile the column loading (possibly in Dobson Units (DU))
     :param dz: in meters (derived from z_stag)
     :param gas_number_density: gas number density profile in [molecules m^-3]
     :param z_dim_axis:
-    :return:
+    :return: gas column (integrated verically) in [molecules m^-2] or in DU
     """
 
-    DU = 2.69 * 10 ** 20  # molecules m**-2
     # dont forget to convert column density from #/m^2 to #/cm^2
-    gas_dobson_units = np.sum(gas_number_density * dz, axis=z_dim_axis) / DU
+    gas_column = np.sum(gas_number_density * dz, axis=z_dim_axis)
+    if in_DU:
+        DU = 2.69 * 10 ** 20  # molecules m**-2
+        gas_column /= DU
 
-    return gas_dobson_units
+    return gas_column

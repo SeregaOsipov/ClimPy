@@ -7,7 +7,7 @@ import glob
 import pandas as pd
 from shapely.geometry import Point
 from climpy.utils.file_path_utils import get_aeronet_file_path_root
-
+from climpy.utils.refractive_index_utils import get_dust_ri
 from climpy.utils.diag_decorators import time_interval_selection, normalize_size_distribution_by_point, \
     normalize_size_distribution_by_area, pandas_time_interval_selection
 
@@ -293,7 +293,7 @@ def read_aeronet_maritime(aeronet_fp):
     :return:
     '''
     dateparse = lambda x: datetime.strptime(x, "%d:%m:%Y %H:%M:%S")
-    aeronet_df = pd.read_csv(aeronet_fp, skiprows=4, na_values=['N/A'],  # N/A is probably -999.000000
+    aeronet_df = pd.read_csv(aeronet_fp, skiprows=4, na_values=['N/A', -999.0],  # N/A is probably -999.000000
                           parse_dates={'time': [0, 1]},
                           date_parser=dateparse)
 
@@ -302,6 +302,9 @@ def read_aeronet_maritime(aeronet_fp):
     # Drop any rows that are all NaN and any cols that are all NaN
     # & then sort by the index
     # an = (aeronet.dropna(axis=1, how='all').dropna(axis=0, how='all').sort_index())
+
+    # drop empty columns
+    aeronet_df.dropna(axis='columns', how='all', inplace=True)
 
     return aeronet_df
 
@@ -409,7 +412,7 @@ def derive_aod_from_size_distribution_using_mie(station, level, res):
     sd_vo = get_size_distribution('*{}*'.format(station), level, res)
 
     # TODO: RI should represent the true aerosol, for now use dust RI
-    from climpy.utils.refractive_index_utils import get_dust_ri
+    # TODO: Aeronet has the RI from retrieval
     ri_vo = get_dust_ri()
 
     import climpy.utils.mie_utils as mie

@@ -150,5 +150,8 @@ ax_b = plt.axes((0.01, 0.015, 0.5, 0.05), facecolor='w')
 ax_b.annotate('{}'.format(url), (0.01, 0.015), fontsize='x-small', xycoords='figure fraction', va='center', ha='left')
 ax_b.axis('off')
 # plt.tight_layout()
+
+save_figure_bundle(os.path.expanduser('~') + '/Pictures/Papers/infographics/aerosols/{}/'.format(x_coord_label),
+                   'Aerosols size distribution and optical properties, {}, wl={}'.format(file_name_postfix, ri_vo['wl'][wl_index]))
 save_figure_bundle(get_root_storage_path_on_hpc() + '/Pictures/Papers/infographics/aerosols/{}/'.format(x_coord_label),
                    'Aerosols size distribution and optical properties, {}, wl={}'.format(file_name_postfix, ri_vo['wl'][wl_index]))

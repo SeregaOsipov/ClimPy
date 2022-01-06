@@ -9,7 +9,7 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 Z_DIM_NC_KEY = 'bottom_top'
 
 
-def plot_domain(nc):
+def plot_domain(nc, subplot_config=111):
     """
     quick way to plot the WRF simulation domain
     :param nc:
@@ -18,10 +18,9 @@ def plot_domain(nc):
     # import to work with WRF output
     import wrf as wrf  # wrf-python library https://wrf-python.readthedocs.io/en/latest/
 
-    fig = plt.figure(figsize=(12, 6))
     # Set the GeoAxes to the projection used by WRF
     cart_proj = wrf.get_cartopy(wrfin=nc)
-    ax = plt.axes(projection=cart_proj)
+    ax = plt.subplot(subplot_config, projection=cart_proj)  # axes
     ax.coastlines('50m', linewidth=0.8)
 
     # Set the map bounds
@@ -29,9 +28,9 @@ def plot_domain(nc):
     ax.set_ylim(wrf.cartopy_ylim(wrfin=nc))
 
     # Add the gridlines
-    ax.gridlines(color="black", linestyle="dotted")
+    # ax.gridlines(color="black", linestyle="dotted")
 
-    return fig, ax
+    return ax
 
 
 def derive_wrf_net_flux_from_accumulated_value(nc, acc_down_name, acc_up_name, tyxSlicesArray, dt):
@@ -113,3 +112,31 @@ def generate_xarray_uniform_time_data(time_variable, td1=None, td2=None):
     rawTimeData = nc_utils.generate_netcdf_uniform_time_data(time_variable, td1, td2)
 
     return rawTimeData
+
+
+def create_times_var(dates):
+    """
+    Convert dates to WRF Times string
+
+    Write like this:
+    dates = pd.date_range(dt.datetime(2050, 1, 1), dt.datetime(2050, 1, 1) + dt.timedelta(hours=1*nc['Times'].shape[0]-1),freq='h')
+    aux_times = create_times_var(dates)
+    nc.variables['Times'][:] = aux_times
+    nc.close()
+
+    :return:
+    """
+
+    aux_times = np.chararray((len(dates), 19), itemsize=1)
+    for i, date in enumerate(dates):
+        aux_times[i] = list(date.strftime("%Y-%m-%d_%H:%M:%S"))
+    return aux_times
+
+
+def get_cell_area(nc):
+    mapfactor_mx = nc.variables['MAPFAC_MX'][0]
+    mapfactor_my = nc.variables['MAPFAC_MY'][0]
+    dx = getattr(nc, 'DX')  # m
+    dy = getattr(nc, 'DY')
+    cell_area = np.ones(mapfactor_mx.shape) * dx / mapfactor_mx * dy / mapfactor_my
+    return cell_area
