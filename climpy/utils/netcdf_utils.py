@@ -20,5 +20,5 @@ def generate_netcdf_uniform_time_data(time_variable, td1=None, td2=None):
 
 
 def convert_time_data_impl(nc_time_var, time_units):
-    time_data = netCDF4.num2date(nc_time_var, time_units, only_use_cftime_datetimes=False, only_use_python_datetimes=True)
+    time_data = netCDF4.num2date(nc_time_var[:], time_units, only_use_cftime_datetimes=False, only_use_python_datetimes=True)
     return time_data

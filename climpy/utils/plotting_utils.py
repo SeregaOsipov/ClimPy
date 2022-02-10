@@ -19,7 +19,7 @@ def screen_width_inches():
     return 1920 / MY_DPI
 
 
-def save_figure_bundle(root_folder, file_name):
+def save_figure_bundle(root_folder, file_name, vector_graphics=False):
     """
     Saves figure in 3 formats, png dpi 600, svg and pdf
     :return:
@@ -27,8 +27,9 @@ def save_figure_bundle(root_folder, file_name):
     save_figure(root_folder, file_name + ' dpi 100', file_ext='png', dpi=100)  # I need it for faster latex compilation
     save_figure(root_folder, file_name, file_ext='png', dpi=300)
     save_figure(root_folder, file_name + ' dpi 600', file_ext='png', dpi=600)  # I need it for faster latex compilation
-    save_figure(root_folder, file_name, file_ext='svg')
-    save_figure(root_folder, file_name, file_ext='pdf')
+    if vector_graphics:
+        save_figure(root_folder, file_name, file_ext='svg')
+        save_figure(root_folder, file_name, file_ext='pdf')
 
 
 def save_figure(root_folder, file_name, file_ext='png', dpi=MY_DPI):
