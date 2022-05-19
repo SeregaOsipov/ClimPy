@@ -28,17 +28,21 @@ The script also performs several auxiliary steps:
 
 This is how to run script in the terminal:
 gogomamba
-python -u ${ClimPy}/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py
+python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py
+
+2050 example:
+gogomamba
+python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py --emac_in=/work/mm0062/b302011/script/Osipov/simulations/AQABA_2050 --out=/work/mm0062/b302074/Data/AirQuality/EMME/IC_BC/2050/unnetcdf/ --start_date=2050-01-01_03 --end_date=2050-01-02_00
 
 Ignore or update current default arguments  
 '''
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--start_date", help="start date in the YYYY-MM-DD format", default='2017-06-15')
-parser.add_argument("--end_date", help="end date in the YYYY-MM-DD format", default='2017-06-25')
-parser.add_argument("--emac_in", help="folder containing emac output", default='/work/mm0062/b302011/script/Osipov/simulations/AQABA')
-parser.add_argument("--out", help="folder to store unnc", default='/work/mm0062/b302074/Data/AirQuality/EMME/IC_BC/unnetcdf/')
+parser.add_argument("--start_date", help="start date in the YYYY-MM-DD_HH format", default='2017-06-15_00')
+parser.add_argument("--end_date", help="end date in the YYYY-MM-DD_HH format", default='2017-09-02_00')
+parser.add_argument("--emac_in", help="folder containing emac output")  #, default='/work/mm0062/b302011/script/Osipov/simulations/AQABA')
+parser.add_argument("--out", help="folder to store unnc")  # , default='/work/mm0062/b302074/Data/AirQuality/EMME/IC_BC/2050/unnetcdf/')
 parser.add_argument("--emac_sim_label", help="folder containing emac output", default='MIM_STD________')   # sim label has fixed width and then filled with ___
 parser.add_argument("--mode", "--port", help="the are only to support pycharm debugging")
 args = parser.parse_args()
@@ -51,13 +55,9 @@ try:
 except FileExistsError:
     print('probably unnetcdf storage directory already exists')
 
-start_date = dt.datetime(2017, 6, 1, 3, 0, 0)  # AQABA is 2017
-end_date = dt.datetime(2017, 6, 5, 3, 0, 0)
-
 # if args.start_date:
-start_date = dt.datetime.strptime(args.start_date, '%Y-%m-%d')
-# if args.end_date:
-end_date = dt.datetime.strptime(args.end_date, '%Y-%m-%d')
+start_date = dt.datetime.strptime(args.start_date, '%Y-%m-%d_%H')
+end_date = dt.datetime.strptime(args.end_date, '%Y-%m-%d_%H')
 
 print('start and end dates are: {} and {}'.format(start_date, end_date))
 
@@ -81,8 +81,9 @@ datasets = (dataset_echam, dataset_e5vdiff, dataset_g3b)
 # datasets = (dataset_g3b, )
 
 get_file_path_impl = get_emac_file_path  # get_merra2_file_path
-# use_multifile_support = True  # swap to False, if netcdfs are not compatible
+# multifile_support = True  # swap to False, if netcdfs are not compatible
 use_multifile_support = False
+multifile_support_on_daily_output = True  # EMAC makes restart and creates new file with hour snapshot
 
 for requested_date in requested_dates:
     print('Processing date {}'.format(requested_date))
@@ -102,8 +103,8 @@ for requested_date in requested_dates:
         var_list = dataset['vars']
         print('DATA SET is {} and the list of variables to process is {}'.format(dataset['name'], dataset['vars']))
 
-        nc_file_path = get_file_path_impl(args.emac_in, args.emac_sim_label, dataset['name'], requested_date, use_multifile_support)
-        if use_multifile_support:
+        nc_file_path = get_file_path_impl(args.emac_in, args.emac_sim_label, dataset['name'], requested_date, use_multifile_support, multifile_support_on_daily_output)
+        if use_multifile_support or multifile_support_on_daily_output:
             nc = netCDF4.MFDataset(nc_file_path)
         else:
             nc = netCDF4.Dataset(nc_file_path)

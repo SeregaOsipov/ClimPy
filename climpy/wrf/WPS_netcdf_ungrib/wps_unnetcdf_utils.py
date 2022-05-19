@@ -86,7 +86,10 @@ def invert_mask(nc_data, nc, time_index, level_index):
 
 def divide_by_cos_lat(nc_data, nc, time_index, level_index):
     # nc_data['slab'] /= np.cos(np.deg2rad(nc.variables['lat'][:))
-    nc_data['slab'] /= nc.variables['coslat'][time_index]
+    if 'time' in nc.variables['coslat'].dimensions:
+        nc_data['slab'] /= nc.variables['coslat'][time_index]
+    else:
+        nc_data['slab'] /= nc.variables['coslat'][:]  # only lat lon
 
 
 def convert_geopotential_to_height(nc_data, nc, time_index, level_index):
@@ -257,7 +260,8 @@ def split_soil_moisture(nc_data, nc, time_index, level_index):
     # rooting_depth_file_path = '/work/mm0062/b302074/Data/AirQuality/AQABA/CMIP6/EMAC_auxilary/RootDepthT42_2002.nc'
     # TODO: Andrea now outputs rooting depth in EMAC, read via aux channel. But, land model in EMAC is so bad, just wait until so come up with a better one
     # this is the original file which is regrided by EMAC in runtime '/pool/data/MESSY/DATA/MESSy2/raw/onemis/GSDT_0.3_X_X_RootDepth_2000.nc'
-    rooting_depth_file_path = '/work/mm0062/b302011/script/Osipov/simulations/AQABA/MIM_STD________20170701_0000_WRF_bc.nc'   # this needs to be enabled in the EMAC regrider output
+    # The data is supposed to be static and interpolated on the EMAC grid
+    rooting_depth_file_path = '/work/mm0062/b302011/script/Osipov/simulations/AQABA_2017/MIM_STD________20170701_0000_WRF_bc.nc'   # this needs to be enabled in the EMAC regrider output
     rd_nc = netCDF4.Dataset(rooting_depth_file_path)
     # rooting_depth = rd_nc.variables['DEPTH'][0, 0]  # m , source file has lev dimensions with size 1
     rooting_depth = rd_nc.variables['rdepth_root_depth'][0]  # m
@@ -596,7 +600,7 @@ def get_merra2_file_path(dataset_name, requested_date):
     return nc_file_path
 
 
-def get_emac_file_path(emac_folder, sim_label, dataset_name, requested_date, use_multifile_support):
+def get_emac_file_path(emac_folder, sim_label, dataset_name, requested_date, multifile_support, multifile_support_on_daily_output):
     '''
     The description of the EMAC sims https://gmd.copernicus.org/articles/9/1153/2016/
 
@@ -628,8 +632,12 @@ def get_emac_file_path(emac_folder, sim_label, dataset_name, requested_date, use
     nc_file_name = '{}{}_{}.nc'.format(sim_label, requested_date.strftime('%Y%m%d_0000'), dataset_name)  # daily pe file
     nc_file_path = '{}/{}'.format(emac_folder, nc_file_name)
 
-    if use_multifile_support:
+    if multifile_support:
         nc_file_name = '{}{}_{}.nc'.format(sim_label, '*', dataset_name)  # requested_date.strftime('%Y%m%d_%H%M')
+        nc_file_path = '{}/{}'.format(emac_folder, nc_file_name)
+
+    if multifile_support_on_daily_output:
+        nc_file_name = '{}{}_{}.nc'.format(sim_label, requested_date.strftime('%Y%m%d_*00'), dataset_name)  # daily per file
         nc_file_path = '{}/{}'.format(emac_folder, nc_file_name)
 
     return nc_file_path

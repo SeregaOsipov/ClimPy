@@ -51,24 +51,8 @@ def aggregate_co2(func):
 def aggregate_by_regions(func):
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
-
-        wb_meta_df = None
-        if 'wb_meta_df' in kwargs:
-            wb_meta_df = kwargs.pop('wb_meta_df')
-        wb_isos = 0
-        if 'wb_isos' in kwargs:
-            wb_isos = kwargs.pop('wb_isos')
-        wb_regions = 0
-        if 'wb_regions' in kwargs:
-            wb_regions = kwargs.pop('wb_regions')
-
         df = func(*args, **kwargs)
-        print(*args)
-
-        if wb_meta_df is not None:
-            inject_region_info(df, wb_meta_df, wb_isos)
-            df = df[df['region'].isin(wb_regions)]
-            regional_df = df.groupby('region').aggregate(np.sum)
+        regional_df = df.groupby('region').aggregate(np.sum)
 
         return regional_df
 
@@ -78,6 +62,7 @@ def aggregate_by_regions(func):
 @to_per_capita
 @aggregate_co2  # combine short and wo short CO2 variables
 @aggregate_by_regions
+@inject_region_info
 def prep_edgar_pollutant(pollutant, file_path_template):
     file_path = file_path_template.format(pollutant, pollutant, pollutant)
     edgar_df = pd.read_excel(file_path, sheet_name='TOTALS BY COUNTRY', header=9)
@@ -106,7 +91,7 @@ def derive_regional_statistics(regional_df):
     return trend, rel_trend, growth_since_1970, None
 
 
-def prep_edgar_totals_by_region(pollutants, file_path_template, wb_meta_df, wb_isos, wb_regions, population_for_per_capita=None):
+def prep_edgar_totals_by_region(pollutants, file_path_template, wb_meta_df, population_for_per_capita=None):
     '''
     AP case
     pollutants = ['BC', 'CO', 'NH3', 'NMVOC', 'NOx', 'OC', 'PM10', 'PM2.5', 'SO2']
@@ -126,7 +111,7 @@ def prep_edgar_totals_by_region(pollutants, file_path_template, wb_meta_df, wb_i
     growths_since_1970 = {}
     sensitivities = {}
     for pollutant in pollutants:  # pollutant = 'SO2'
-        regional_df = prep_edgar_pollutant(pollutant, file_path_template, wb_meta_df=wb_meta_df, wb_isos=wb_isos, wb_regions=wb_regions, population_for_per_capita=population_for_per_capita)
+        regional_df = prep_edgar_pollutant(pollutant, file_path_template, wb_meta_df=wb_meta_df, population_for_per_capita=population_for_per_capita)  # , wb_isos=wb_isos, wb_regions=wb_regions
         regional_df = regional_df.transpose()
 
         edgars[pollutant] = regional_df
