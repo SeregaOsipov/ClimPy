@@ -4,7 +4,7 @@ import netCDF4
 import numpy as np
 import sys
 
-__author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
+__author__ = 'Sergey Osipov <Serheadega.Osipov@gmail.com>'
 
 
 ##########################
@@ -260,7 +260,8 @@ def split_soil_moisture(nc_data, nc, time_index, level_index):
     # rooting_depth_file_path = '/work/mm0062/b302074/Data/AirQuality/AQABA/CMIP6/EMAC_auxilary/RootDepthT42_2002.nc'
     # TODO: Andrea now outputs rooting depth in EMAC, read via aux channel. But, land model in EMAC is so bad, just wait until so come up with a better one
     # this is the original file which is regrided by EMAC in runtime '/pool/data/MESSY/DATA/MESSy2/raw/onemis/GSDT_0.3_X_X_RootDepth_2000.nc'
-    rooting_depth_file_path = '/work/mm0062/b302074/Data/AirQuality/EMME/2017/IC_BC/emac/MIM_STD________20170101_0000_WRF_bc.nc'   # this needs to be enabled in the EMAC regrider output
+    # The data is supposed to be static and interpolated on the EMAC grid
+    rooting_depth_file_path = '/work/mm0062/b302011/script/Osipov/simulations/AQABA_2017/MIM_STD________20170701_0000_WRF_bc.nc'   # this needs to be enabled in the EMAC regrider output
     rd_nc = netCDF4.Dataset(rooting_depth_file_path)
     # rooting_depth = rd_nc.variables['DEPTH'][0, 0]  # m , source file has lev dimensions with size 1
     rooting_depth = rd_nc.variables['rdepth_root_depth'][0]  # m

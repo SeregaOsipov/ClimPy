@@ -32,7 +32,7 @@ python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py
 
 2050 example:
 gogomamba
-python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py --emac_in=/work/mm0062/b302074/Data/AirQuality/EMME/2050/IC_BC/emac --out=/work/mm0062/b302074/Data/AirQuality/EMME/2050/IC_BC/unnetcdf/ --start_date=2050-01-01_00 --end_date=2050-01-02_00
+python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py --emac_in=/work/mm0062/b302011/script/Osipov/simulations/AQABA_2050 --out=/work/mm0062/b302074/Data/AirQuality/EMME/IC_BC/2050/unnetcdf/ --start_date=2050-01-01_03 --end_date=2050-01-02_00
 
 Ignore or update current default arguments  
 '''
