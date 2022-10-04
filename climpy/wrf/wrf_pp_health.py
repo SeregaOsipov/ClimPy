@@ -14,7 +14,7 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", help="pycharm")
 parser.add_argument("--port", help="pycharm")
-parser.add_argument("--wrf_in", help="wrf input file path")  # default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v15/output/pp_wrf_health/boa/wrfout_d01_2017-08-31_00:00:00'
+parser.add_argument("--wrf_in", help="wrf input file path", default='/work/mm0062/b302074/Data/AirQuality/EMME/chem_100_v100/output/pp_wrf_health/boa/wrfout_d01_2017-06-15_00:00:00')
 parser.add_argument("--wrf_out", help="wrf output file path")  # default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v15/output/pp_wrf_health/pm/wrfout_d01_2017-08-31_00:00:00'
 args = parser.parse_args()
 
@@ -49,7 +49,7 @@ squeeze_level_dim = True
 if squeeze_level_dim:
     xr_in = xr_in.squeeze(dim='bottom_top')  # dims order is inversed in xarray and numpy
 
-# for now we will process everything in one go, may require a lot of memory
+# Process everything in one go, may require a lot of memory
 # time_index = None  # equivalent to wrf.ALL_TIMES
 
 # compute PMs
@@ -69,9 +69,7 @@ for pm_sizes, key in zip([pm1_sizes, pm25_sizes, pm10_sizes], pm_keys):
     # wrf_diags_vstack = wrf_diags_vstack[..., boa_ind]
     pm = np.sum(wrf_diags_vstack, axis=0)  # this will sum up PM from individual species
 
-
-    # export by type
-    var_key = '{}_by_type'.format(key)
+    var_key = '{}_by_type'.format(key)  # export by type
     print('diag {} computed, proceed to saving'.format(var_key))
     # dims = ('type',) + wrf_ds['so4aj'].dims
     # data = xr.Dataset({var_key: (dims, wrf_diags_vstack.filled())})
@@ -98,5 +96,10 @@ print('PMs are done, proceed to coordinate variables')
 # export time/lat/lon as well
 
 export_to_netcdf(xr_in[['XTIME', 'XLONG', 'XLAT']])
+
+#%% Compute the UVI
+print('computing UV index')
+xr_in['UVI'] = xr_in['PH_ERYTHEMA']/25 * 10**3  # UVI = 1(25 mW m^-2) * integral (I*w*dlambda)
+xr_in.to_netcdf(args.wrf_in)
 
 print('DONE')

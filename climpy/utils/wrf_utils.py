@@ -18,9 +18,8 @@ def plot_domain(nc, subplot_config=111):
     # import to work with WRF output
     import wrf as wrf  # wrf-python library https://wrf-python.readthedocs.io/en/latest/
 
-    # Set the GeoAxes to the projection used by WRF
-    cart_proj = wrf.get_cartopy(wrfin=nc)
-    ax = plt.subplot(subplot_config, projection=cart_proj)  # axes
+    projection = wrf.get_cartopy(wrfin=nc)  # Set the GeoAxes to the projection used by WRF
+    ax = plt.subplot(subplot_config, projection=projection)  # axes
     ax.coastlines('50m', linewidth=0.8)
 
     # Set the map bounds
@@ -29,6 +28,7 @@ def plot_domain(nc, subplot_config=111):
 
     # Add the gridlines
     # ax.gridlines(color="black", linestyle="dotted")
+    # gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, x_inline=False, y_inline=False)
 
     return ax
 
