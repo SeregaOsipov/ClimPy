@@ -118,7 +118,7 @@ def derive_land_sea_merra2(nc_data, nc, time_index, level_index):
 
 def derive_3d_pressure_merra2(nc_data, nc, time_index, level_index):
     # To get the pressure for a selected layer I still have to build the entire 3d field first
-
+    # TODO: use derive_merra2_pressure_stag_profile from merra_utils.py
     # see this doc for details on Vertical Structure https://gmao.gsfc.nasa.gov/pubs/docs/Bosilovich785.pdf
     layer_pressure_thickness = nc.variables['DELP'][time_index]  # 3d
 
