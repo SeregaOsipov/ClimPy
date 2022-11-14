@@ -26,14 +26,14 @@ def get_sea_salt_fractions(date_to_process):
 
 
 def get_bc_fractions(date_to_process):
-    natural_fraction = 1
-    anthropogenic_fraction = 0
+    natural_fraction = 0
+    anthropogenic_fraction = 1
     return natural_fraction, anthropogenic_fraction
 
 
 def get_oc_fractions(date_to_process):
-    natural_fraction = 1
-    anthropogenic_fraction = 0
+    natural_fraction = 0
+    anthropogenic_fraction = 1
     return natural_fraction, anthropogenic_fraction
 
 
