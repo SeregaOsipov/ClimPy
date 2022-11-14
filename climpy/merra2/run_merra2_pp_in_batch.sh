@@ -6,6 +6,8 @@ gogomamba
 # slightly malformed input data
 input_start=1991-6-15
 input_end=1991-7-15
+#input_start=1981-3-28
+#input_end=1981-4-15
 
 # After this, startdate and enddate will be valid ISO 8601 dates,
 # or the script will have aborted when it encountered unparseable data
