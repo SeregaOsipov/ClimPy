@@ -2,13 +2,16 @@ import xarray as xr
 import datetime as dt
 import cartopy.crs as crs
 import numpy as np
+
+from climpy.utils.earthdata_utils import check_and_generate_earthdata_netrc, get_credentials_from_netrc, \
+    open_xarray_dataset_at_earthdata
 from climpy.utils.file_path_utils import get_root_storage_path_on_hpc
 from matplotlib.colors import LinearSegmentedColormap
 from climpy.utils.plotting_utils import save_figure
 # import matplotlib.pyplot as plt
 # from climpy.utils.merra_utils import derive_merra2_pressure_stag_profile
 
-data_root = '/work/mm0062/b302074/Data/NASA/MERRA2/'
+local_data_root = '/work/mm0062/b302074/Data/NASA/MERRA2/'
 
 #%% derive fractions for each aerosol type
 
@@ -44,11 +47,23 @@ def get_sulfate_fractions(date_to_process):
     Use TROPPB in tavg1_2d_slv_Nx for that
     :return:
     '''
-    fp = '{}/{}/MERRA2_100.{}.{}.nc4'.format(data_root, 'inst3_3d_aer_Nv', 'inst3_3d_aer_Nv', date_to_process.strftime('%Y%m%d'))
-    xr_3d = xr.open_dataset(fp)
+    # Offline implementation, i.e. local filepaths
+    # fp = '{}/{}/MERRA2_100.{}.{}.nc4'.format(local_data_root, 'inst3_3d_aer_Nv', 'inst3_3d_aer_Nv', date_to_process.strftime('%Y%m%d'))
+    # xr_3d = xr.open_dataset(fp)
+    # OpenDAP impl, example 'https://goldsmr5.gesdisc.eosdis.nasa.gov/opendap/MERRA2/M2I3NVAER.5.12.4/1981/01/MERRA2_100.inst3_3d_aer_Nv.19810101.nc4'
+    data_root = 'https://goldsmr5.gesdisc.eosdis.nasa.gov/opendap'
+    fp = '{}/{}/{}/{}/{}/MERRA2_100.{}.{}.nc4'.format(data_root, 'MERRA2', 'M2I3NVAER.5.12.4', date_to_process.year,
+                                                      date_to_process.strftime('%m'), 'inst3_3d_aer_Nv',
+                                                      date_to_process.strftime('%Y%m%d'))  # opendap
+    xr_3d = open_xarray_dataset_at_earthdata(fp)
 
-    fp = '{}/{}/MERRA2_100.{}.{}.nc4'.format(data_root, 'tavg3_3d_nav_Ne', 'tavg3_3d_nav_Ne', date_to_process.strftime('%Y%m%d'))
-    xr_3d_nav = xr.open_dataset(fp)  # provides stag grid
+    # fp = '{}/{}/MERRA2_100.{}.{}.nc4'.format(local_data_root, 'tavg3_3d_nav_Ne', 'tavg3_3d_nav_Ne', date_to_process.strftime('%Y%m%d'))
+    # xr_3d_nav = xr.open_dataset(fp)  # provides stag grid
+    data_root = 'https://goldsmr5.gesdisc.eosdis.nasa.gov/opendap'
+    fp = '{}/{}/{}/{}/{}/MERRA2_100.{}.{}.nc4'.format(data_root, 'MERRA2', 'M2T3NENAV.5.12.4', date_to_process.year,
+                                                      date_to_process.strftime('%m'), 'tavg3_3d_nav_Ne',
+                                                      date_to_process.strftime('%Y%m%d'))  # opendap
+    xr_3d_nav = open_xarray_dataset_at_earthdata(fp)
 
     dz = -1*xr_3d_nav['ZLE'].diff(dim='lev', )
 
@@ -80,8 +95,13 @@ def derive_aod_fractions(date_to_process, keys, anth_fracs, natural_fracs):
     :return:
     '''
 
-    fp = '{}/{}/MERRA2_100.{}.{}.nc4'.format(data_root, 'tavg1_2d_aer_Nx', 'tavg1_2d_aer_Nx', date_to_process.strftime('%Y%m%d'))
-    ds = xr.open_dataset(fp)
+    # fp = '{}/{}/MERRA2_100.{}.{}.nc4'.format(local_data_root, 'tavg1_2d_aer_Nx', 'tavg1_2d_aer_Nx', date_to_process.strftime('%Y%m%d'))
+    # ds = xr.open_dataset(fp)
+    data_root = 'https://goldsmr4.gesdisc.eosdis.nasa.gov/opendap'
+    fp = '{}/{}/{}/{}/{}/MERRA2_100.{}.{}.nc4'.format(data_root, 'MERRA2', 'M2T1NXAER.5.12.4', date_to_process.year,
+                                                      date_to_process.strftime('%m'), 'tavg1_2d_aer_Nx',
+                                                      date_to_process.strftime('%Y%m%d'))  # opendap
+    ds = open_xarray_dataset_at_earthdata(fp)
 
     # check the summation
     aod_sum = ds['DUEXTTAU'] + ds['SSEXTTAU'] + ds['SUEXTTAU'] + ds['OCEXTTAU'] +  + ds['BCEXTTAU']
