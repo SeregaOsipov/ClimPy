@@ -99,6 +99,7 @@ export_to_netcdf(xr_in[['XTIME', 'XLONG', 'XLAT']])
 
 #%% Compute the UVI
 print('computing UV index')
+xr_in.load()  # preload to avoid saving issues (otherwise you get zeros in the netcdf)
 xr_in['UVI'] = xr_in['PH_ERYTHEMA']/25 * 10**3  # UVI = 1(25 mW m^-2) * integral (I*w*dlambda)
 xr_in.to_netcdf(args.wrf_in)
 
