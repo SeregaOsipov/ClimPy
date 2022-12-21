@@ -2,10 +2,11 @@ import struct
 import datetime as dt
 import netCDF4
 import numpy as np
+import xarray as xr
 import sys
+from climpy.utils.time_utils import to_datetime
 
 __author__ = 'Sergey Osipov <Serheadega.Osipov@gmail.com>'
-
 
 ##########################
 # Use the METGRID.TBL var names as a key for the dictionary that holds the mapping rules for this variable
@@ -84,27 +85,27 @@ def invert_mask(nc_data, nc, time_index, level_index):
     nc_data['slab'] = 1 - nc_data['slab']
 
 
-def divide_by_cos_lat(nc_data, nc, time_index, level_index):
+def divide_by_cos_lat(nc_data, nc, level_index):
     # nc_data['slab'] /= np.cos(np.deg2rad(nc.variables['lat'][:))
-    if 'time' in nc.variables['coslat'].dimensions:
-        nc_data['slab'] /= nc.variables['coslat'][time_index]
-    else:
-        nc_data['slab'] /= nc.variables['coslat'][:]  # only lat lon
+    # if 'time' in nc.variables['lat'].dimensions:
+    #     lat_mesh = nc.variables['lat'][time_index]
+    # else:
+    lon_mesh, lat_mesh = np.meshgrid(nc.variables['lon'], nc.variables['lat'][:])  # only lat lon
+    nc_data['slab'] /= np.cos(np.deg2rad(lat_mesh))
 
-
-def convert_geopotential_to_height(nc_data, nc, time_index, level_index):
+def convert_geopotential_to_height(nc_data, nc, level_index):
     nc_data['slab'] /= 9.81
     nc_data['units'] = 'm'
 
 
-def potential_to_regular_temperature(nc_data, nc, time_index, level_index):
-        pressure = nc.variables['press'][time_index, level_index]  # Pa
-        # convert it to normal temperature: Tn = Tp / (p0/p)^kappa
-        kappa = 0.2854
-        nc_data['slab'] /= (1000.*10**2/pressure)**kappa
+def potential_to_regular_temperature(nc_data, nc, level_index):
+    pressure = nc.variables['press'][level_index]  # Pa
+    # convert it to normal temperature: Tn = Tp / (p0/p)^kappa
+    kappa = 0.2854
+    nc_data['slab'] /= (1000.*10**2/pressure)**kappa
 
 
-def convert_unit_ratio_to_percents(nc_data, nc, time_index, level_index):
+def convert_unit_ratio_to_percents(nc_data, nc, level_index):
     nc_data['slab'] *= 100
     nc_data['units'] = '%'
 
@@ -180,7 +181,7 @@ def interpolate_soil_temperatures_merra2(nc_data, nc, time_index, level_index):
     soil_z_stag[:, 150, 200]
 
 
-def split_soil_temperature(nc_data, nc, time_index, level_index):
+def split_soil_temperature(nc_data, nc, level_index):
     '''
     EMAC specific implementation
     This breaks 3d deep soil temperature for each layer slice
@@ -213,7 +214,7 @@ def split_soil_temperature(nc_data, nc, time_index, level_index):
     nc_data['slab'] = nc_data['slab'][soil_layer]
 
 
-def split_soil_moisture(nc_data, nc, time_index, level_index):
+def split_soil_moisture(nc_data, nc, level_index):
     '''
     EMAC specific implementation
 
@@ -238,7 +239,6 @@ def split_soil_moisture(nc_data, nc, time_index, level_index):
     :param nc_data:
     :param nc:
     :param time_index:
-    :param level_index:
     :return:
     '''
 
@@ -258,26 +258,29 @@ def split_soil_moisture(nc_data, nc, time_index, level_index):
     # I made a local copy
     # rooting_depth_file_path = '/work/mm0062/b302074/Data/AirQuality/AQABA/CMIP6/RootDepth1deg_2002.nc'
     # rooting_depth_file_path = '/work/mm0062/b302074/Data/AirQuality/AQABA/CMIP6/EMAC_auxilary/RootDepthT42_2002.nc'
-    # TODO: Andrea now outputs rooting depth in EMAC, read via aux channel. But, land model in EMAC is so bad, just wait until so come up with a better one
     # this is the original file which is regrided by EMAC in runtime '/pool/data/MESSY/DATA/MESSy2/raw/onemis/GSDT_0.3_X_X_RootDepth_2000.nc'
     # The data is supposed to be static and interpolated on the EMAC grid
-    rooting_depth_file_path = '/work/mm0062/b302011/script/Osipov/simulations/AQABA_2017/MIM_STD________20170701_0000_WRF_bc.nc'   # this needs to be enabled in the EMAC regrider output
-    rd_nc = netCDF4.Dataset(rooting_depth_file_path)
+    # rooting_depth_file_path = '/work/mm0062/b302011/script/Osipov/simulations/AQABA_2017/MIM_STD________20170701_0000_WRF_bc.nc'   # this needs to be enabled in the EMAC regrider output
+    # rd_nc = netCDF4.Dataset(rooting_depth_file_path)
     # rooting_depth = rd_nc.variables['DEPTH'][0, 0]  # m , source file has lev dimensions with size 1
-    rooting_depth = rd_nc.variables['rdepth_root_depth'][0]  # m
-    rooting_depth[rooting_depth==-1] = np.NaN  # sea mask
+    # rooting_depth = rd_nc.variables['rdepth_root_depth'][0]  # m
+    # rooting_depth[rooting_depth == -1] = np.NaN  # sea mask
 
-    # TODO: until the file is regridded assume rooting depth is 1 m
-    # rooting_depth = np.ones(nc_data['slab'].shape)
+    # Andrea now outputs rooting depth in EMAC, read via aux channel (WRF_bc)
+    rooting_depth = nc.variables['rdepth_root_depth']  # m
+    rooting_depth = rooting_depth.where(rooting_depth!=-1)  # sea mask
+
     # TODO: have to setup realistic profile, for now uniform above rooting depth
     # deeper than rooting depth, then set 0
-    ind = rooting_depth > layer_depth
-    nc_data['slab'][ind] /= rooting_depth[ind]
-    nc_data['slab'][np.logical_not(ind)] = 0
+        # ind = rooting_depth > layer_depth
+        # nc_data['slab'][ind] /= rooting_depth[ind]
+        # nc_data['slab'][np.logical_not(ind)] = 0
+    nc_data['slab'] = xr.where(rooting_depth > layer_depth, nc_data['slab']/rooting_depth, 0)
 
     # filter unrealistic values
-    ind = nc_data['slab'] > 1
-    nc_data['slab'][ind] = 1
+        # ind = nc_data['slab'] > 1
+        # nc_data['slab'][ind] = 1
+    nc_data['slab'] = nc_data['slab'].where(nc_data['slab']<1, 1)
 
     # update units
     nc_data['units'] = 'm-3 m-3'
@@ -367,7 +370,16 @@ def format_hdate(time_data):
     return time_data.strftime('%Y-%m-%d_%H:%M:%S')  # format as "2008:01:01_00:00:00"
 
 
-def prepare_nc_data(nc, _FIELD_MAP, var_key, time_index, level_index, map_projection_version):
+def prepare_nc_data(df, _FIELD_MAP, var_key, level_index, map_projection_version):
+    '''
+
+    :param df: DataFrame / xarray
+    :param _FIELD_MAP:
+    :param var_key:
+    :param level_index:
+    :param map_projection_version:
+    :return:
+    '''
     # map_projection_version possible values:
     # 0 is lat-lon projection (Cylindrical equidistant)
     # 4 is Gaussian projections
@@ -376,14 +388,14 @@ def prepare_nc_data(nc, _FIELD_MAP, var_key, time_index, level_index, map_projec
     nc_var_key = _FIELD_MAP[var_key].netcdf_var_key
 
     nc_data = {}
-    nc_data['nx'] = nc.dimensions[_FIELD_MAP['longitude']].size
-    nc_data['ny'] = nc.dimensions[_FIELD_MAP['latitude']].size
+    nc_data['nx'] = df.dims[_FIELD_MAP['longitude']]
+    nc_data['ny'] = df.dims[_FIELD_MAP['latitude']]
     nc_data['units'] = ''
-    if hasattr(nc.variables[nc_var_key], 'units'):
-        nc_data['units'] = nc.variables[nc_var_key].units
+    if hasattr(df.variables[nc_var_key], 'units'):
+        nc_data['units'] = df.variables[nc_var_key].units
 
-    lons = nc.variables[_FIELD_MAP['longitude']][:]
-    lats = nc.variables[_FIELD_MAP['latitude']][:]
+    lons = df.variables[_FIELD_MAP['longitude']][:]
+    lats = df.variables[_FIELD_MAP['latitude']][:]
 
     # I have to specify south west corner of the data, adjust data accordingly
     # TODO: print('Flip_lat_dim is probably dataset dependent, check carefully')
@@ -411,8 +423,8 @@ def prepare_nc_data(nc, _FIELD_MAP, var_key, time_index, level_index, map_projec
     # //TODO: the set of variables depends on the projection
 
     nc_data['xlvl'] = 200100  # indicates surface data
-    if _FIELD_MAP['level'] in nc.variables[nc_var_key].dimensions:  # nc.dimensions.keys():
-        nc_data['xlvl'] = nc.variables[_FIELD_MAP['level']][level_index]
+    if _FIELD_MAP['level'] in df.variables[nc_var_key].dims:  # nc.dims.keys():
+        nc_data['xlvl'] = df.variables[_FIELD_MAP['level']][level_index]
 
     if _FIELD_MAP[var_key].at_sea_level_pressure:
         nc_data['xlvl'] = 201300  # indicates sea-level pressure
@@ -423,7 +435,8 @@ def prepare_nc_data(nc, _FIELD_MAP, var_key, time_index, level_index, map_projec
     nc_data['nlats'] = nc_data['ny'] / 2  # // TODO: not sure this is correct
     nc_data['earth_radius'] = 6367.47  # the value is taken from the grib reader # ml data reported value 6371.229492
 
-    nc_data['time_data'] = netCDF4.num2date(nc.variables['time'][time_index], nc.variables['time'].units)  # TODO: these dates are ugly
+    # nc_data['time_data'] = netCDF4.num2date(nc.variables['time'].values[0], nc.variables['time'].units)  # TODO: these dates are ugly
+    nc_data['time_data'] = to_datetime(df.variables['time'].values)  # has to have a single value
     nc_data['hdate'] = format_hdate(nc_data['time_data'])
     nc_data['xfcst'] = 0.0
     nc_data['map_source'] = "EMAC CCMI"  # seems to be arbitrary
@@ -440,15 +453,15 @@ def prepare_nc_data(nc, _FIELD_MAP, var_key, time_index, level_index, map_projec
 
     # read the slab data if it based only on a single netcdf variable
     if not _FIELD_MAP[var_key].read_in_pp_impl:
-        if _FIELD_MAP['level'] in nc.variables[nc_var_key].dimensions:
-            nc_data['slab'] = nc.variables[nc_var_key][time_index, level_index]
+        if _FIELD_MAP['level'] in df.variables[nc_var_key].dims:
+            nc_data['slab'] = df.variables[nc_var_key][level_index]
         else:
-            nc_data['slab'] = nc.variables[nc_var_key][time_index]
+            nc_data['slab'] = df.variables[nc_var_key]
 
     # if necessary, do the post-processing now
     if _FIELD_MAP[var_key].pp_impl:
-        print('doing pp for {}'.format(var_key))
-        _FIELD_MAP[var_key].pp_impl(nc_data, nc, time_index, level_index)
+        # print('doing pp for {}'.format(var_key))
+        _FIELD_MAP[var_key].pp_impl(nc_data, df, level_index)
 
     # has to flip the data
     if flip_lat_dim:
@@ -471,7 +484,7 @@ def prepare_nc_data(nc, _FIELD_MAP, var_key, time_index, level_index, map_projec
          Xlv = 2.5e6
          Rv = 461.5
          # we already have the dew temperature, read the regular temperature
-         T = nc.variables['t2m'][time_index]
+         T = df.variables['t2m']
          dp = nc_data['slab']
          rh = np.exp( Xlv / Rv * (1. / T - 1. / dp)) * 1.E2
 
@@ -481,7 +494,7 @@ def prepare_nc_data(nc, _FIELD_MAP, var_key, time_index, level_index, map_projec
     elif var_key == 'sd':
         # nc_data['slab'] *= 1000
         # looks like ECMWF has snow density which is not equal to the 1000, use the variable
-        snow_density_data = nc.variables['rsn'][time_index]
+        snow_density_data = df.variables['rsn']
         nc_data['slab'] *= snow_density_data
         nc_data['units'] = 'kg m-2'
         nc_data['field'] = 'SNOW'
@@ -490,6 +503,8 @@ def prepare_nc_data(nc, _FIELD_MAP, var_key, time_index, level_index, map_projec
         nc_data['slab'][ind] = 1
         nc_data['slab'][np.logical_not(ind)] = 0
         nc_data['units'] = '0/1 Flag'
+
+    nc_data['slab'] = nc_data['slab'].to_numpy()  # once all is done (pre & pp processing), convert DF to numpy
 
     return nc_data
 
@@ -645,7 +660,6 @@ def get_emac_file_path(emac_folder, sim_label, dataset_name, requested_date, mul
 
 _FIELD_MAP_EMAC_2_WRF = {
     # ECHAM5
-    'TT': WrfMetgridMapItem('tpot', pp_impl=potential_to_regular_temperature),  # Temperature, K
     'HGT': WrfMetgridMapItem('geopot', pp_impl=convert_geopotential_to_height),  # Height (rho grid), m
     'PRESSURE': WrfMetgridMapItem('press'),  # Pressure, Pa
     'UU': WrfMetgridMapItem('um1', pp_impl=divide_by_cos_lat),
@@ -657,6 +671,7 @@ _FIELD_MAP_EMAC_2_WRF = {
     'SKINTEMP': WrfMetgridMapItem('tsurf'),  # skin temperature, K.
 
     # e5vdiff
+    'TT': WrfMetgridMapItem('tpot', pp_impl=potential_to_regular_temperature),  # Temperature, K
     'T': WrfMetgridMapItem('temp2'),  # Temperature at 2 m, K
 
     # g3b

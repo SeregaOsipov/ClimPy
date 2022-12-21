@@ -1,9 +1,23 @@
 import datetime as dt
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import time
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
+
+
+def to_datetime(date):  # np.datetime64 -> datetime
+    """
+    Converts a numpy datetime64 object to a python datetime object
+    Input:
+      date - a np.datetime64 object
+    Output:
+      DATE - a python datetime object
+    """
+    timestamp = ((date - np.datetime64('1970-01-01T00:00:00'))
+                 / np.timedelta64(1, 's'))
+    return datetime.utcfromtimestamp(timestamp)
 
 
 def datetime_to_timestamp(time_data):

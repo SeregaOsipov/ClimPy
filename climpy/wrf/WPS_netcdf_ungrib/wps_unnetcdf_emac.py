@@ -1,9 +1,13 @@
 import argparse
-import netCDF4
+from distutils.util import strtobool
+
 import numpy as np
+import xarray as xr
 import datetime as dt
 from dateutil import rrule
 import os
+
+from climpy.utils.debug_utils import detailed_print
 from climpy.wrf.WPS_netcdf_ungrib.wps_unnetcdf_utils import prepare_nc_data, wrf_write, \
     get_merra2_file_path, LATLON_PROJECTION, format_hdate, _FIELD_MAP_EMAC_2_WRF, get_emac_file_path
 from climpy.utils.netcdf_utils import convert_time_data_impl
@@ -32,11 +36,12 @@ python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py
 
 2050 example:
 gogomamba
-python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py --emac_in=/work/mm0062/b302011/script/Osipov/simulations/AQABA_2050 --out=/work/mm0062/b302074/Data/AirQuality/EMME/IC_BC/2050/unnetcdf/ --start_date=2050-01-01_03 --end_date=2050-01-02_00
+python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py --emac_in=/work/mm0062/b302011/script/Osipov/simulations/AQABA_2050 --out=/work/mm0062/b302074/Data/AirQuality/EMME/2050/IC_BC/unnetcdf/ --start_date=2050-08-03_00 --end_date=2051-01-02_00 --emac_sim_label=test01_________
 
 Ignore or update current default arguments  
 '''
 
+#%%
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--start_date", help="start date in the YYYY-MM-DD_HH format", default='2017-06-15_00')
@@ -44,6 +49,7 @@ parser.add_argument("--end_date", help="end date in the YYYY-MM-DD_HH format", d
 parser.add_argument("--emac_in", help="folder containing emac output")  #, default='/work/mm0062/b302011/script/Osipov/simulations/AQABA')
 parser.add_argument("--out", help="folder to store unnc")  # , default='/work/mm0062/b302074/Data/AirQuality/EMME/IC_BC/2050/unnetcdf/')
 parser.add_argument("--emac_sim_label", help="folder containing emac output", default='MIM_STD________')   # sim label has fixed width and then filled with ___
+parser.add_argument("--detailed_debug", help="True/False", type=strtobool, default=False)
 parser.add_argument("--mode", "--port", help="the are only to support pycharm debugging")
 args = parser.parse_args()
 
@@ -70,20 +76,19 @@ requested_dates = requested_dates[:-1]
 _FIELD_MAP = _FIELD_MAP_EMAC_2_WRF
 
 # build the list of the datasets and variables to extract from them
-dataset_echam = {"name": "ECHAM5", "vars": list(_FIELD_MAP.keys())[0:6]}
-dataset_e5vdiff = {"name": "e5vdiff", "vars": list(_FIELD_MAP.keys())[6:7]}
-dataset_g3b = {"name": "g3b", "vars": list(_FIELD_MAP.keys())[7:25]}
+# dataset_echam = {"name": "ECHAM5", "vars": list(_FIELD_MAP.keys())[0:5]}
+# dataset_e5vdiff = {"name": "e5vdiff", "vars": list(_FIELD_MAP.keys())[5:7]}
+# dataset_g3b = {"name": "g3b", "vars": list(_FIELD_MAP.keys())[7:25]}
+
+var_list = list(_FIELD_MAP.keys())[0:25]
+streams = ('ECHAM5', 'e5vdiff', 'g3b', 'WRF_bc')
 
 # list of the all the datasets to process
-datasets = (dataset_echam, dataset_e5vdiff, dataset_g3b)
-
-# subset for debugging
-# dataset_g3b = {"name": "g3b", "vars": list(_FIELD_MAP.keys())[23:25]}
-# datasets = (dataset_g3b, )
+# datasets = (dataset_echam, dataset_e5vdiff, dataset_g3b)
 
 get_file_path_impl = get_emac_file_path  # get_merra2_file_path
 # multifile_support = True  # swap to False, if netcdfs are not compatible
-use_multifile_support = False
+use_multifile_support = False  # TODO: currently, xarray merging across different streams will not work (probably, because it has to merge and concatenate at the same time)
 multifile_support_on_daily_output = True  # EMAC makes restart and creates new file with hour snapshot
 
 for requested_date in requested_dates:
@@ -100,74 +105,85 @@ for requested_date in requested_dates:
     print('Creating file ' + out_file_name_ml)
     f_ml = open(out_file_name_ml, 'wb')
 
-    for dataset in datasets:
-        var_list = dataset['vars']
-        print('DATA SET is {} and the list of variables to process is {}'.format(dataset['name'], dataset['vars']))
+    # employ xarray to merge across different EMAC streams into single DataSet
+    nc_stream_file_paths = ()
+    xr_streams = ()
+    for stream in streams:  # collect several EMAC output streams into single xarray
+        nc_stream_file_path = get_file_path_impl(args.emac_in, args.emac_sim_label, stream, requested_date, use_multifile_support, multifile_support_on_daily_output)
+        nc_stream_file_paths += (nc_stream_file_path,)
+        print(nc_stream_file_path)
+        xr_stream = xr.open_mfdataset(nc_stream_file_path)
+        xr_streams += (xr_stream,)
 
-        nc_file_path = get_file_path_impl(args.emac_in, args.emac_sim_label, dataset['name'], requested_date, use_multifile_support, multifile_support_on_daily_output)
-        if use_multifile_support or multifile_support_on_daily_output:
-            nc = netCDF4.MFDataset(nc_file_path)
-        else:
-            nc = netCDF4.Dataset(nc_file_path)
+    time_dependent_df = xr.merge(xr_streams)
 
+    print('Will open and merge the following streams: {}'.format(nc_stream_file_paths))
+    df = time_dependent_df.sel(time=requested_date, drop=True)  # do the time selection
+    df['time'] = requested_date  # have to store the date somewhere
 
-        def get_time_index_in_netcdf(nc):
-            # check if it is the time invariant dataset (constants)
-            # TODO: check
-            # if 'Time-invariant' in nc.LongName:
-            #     return 0
+    print('The list of variables to process is {}'.format(var_list))
 
-            nc_dates = convert_time_data_impl(nc['time'], nc['time'].units)
-
-            generate_dates = False
-            if generate_dates:  # instead generate time and use the fact that all file_paths are daily
-                # reading the actual time stamps causes issues, since we have instantaneous and time average fields
-                # nc_start_date = dt.datetime.strptime(nc.RangeBeginningDate, '%Y-%m-%d')
-                nc_start_date = dt.datetime(nc_dates[0].year, nc_dates[0].month, nc_dates[0].day, nc_dates[0].hour, nc_dates[0].minute, 0)
-                nc_end_date = dt.datetime(nc_dates[0].year, nc_dates[0].month+1, nc_dates[0].day, nc_dates[0].hour, nc_dates[0].minute, 0)
-                # nc_end_date = nc_start_date + dt.timedelta(days=1)
-                # hours_interval = int(24/nc.dimensions['time'].size)  # TODO: FIX ME
-                hours_interval = 10
-                nc_dates = list(rrule.rrule(rrule.HOURLY, interval=hours_interval, dtstart=nc_start_date, until=nc_end_date))
-                nc_dates = np.array(nc_dates)
-                nc_dates = nc_dates[:-1]
-
-            # find the requested date in the file
-            time_index = np.where(nc_dates == requested_date)[0]
-            if time_index.size == 0:
-                raise Exception('unnetcdf_MERRA2', 'requested time {} can not be found in the netcdf file {}'.format(requested_date, nc_file_path))
-            time_index = time_index[0]
-
-            return time_index
+    # nc_file_path = get_file_path_impl(args.emac_in, args.emac_sim_label, dataset['name'], requested_date, use_multifile_support, multifile_support_on_daily_output)
+    # if use_multifile_support or multifile_support_on_daily_output:
+    #     nc = netCDF4.MFDataset(nc_file_path)
+    # else:
+    #     nc = netCDF4.Dataset(nc_file_path)
 
 
-        time_index = get_time_index_in_netcdf(nc)
+    # def get_time_index_in_netcdf(nc):
+    #     # check if it is the time invariant dataset (constants)
+    #     # TODO: check
+    #     # if 'Time-invariant' in nc.LongName:
+    #     #     return 0
+    #
+    #     nc_dates = convert_time_data_impl(nc['time'], nc['time'].units)
+    #
+    #     generate_dates = False
+    #     if generate_dates:  # instead generate time and use the fact that all file_paths are daily
+    #         # reading the actual time stamps causes issues, since we have instantaneous and time average fields
+    #         # nc_start_date = dt.datetime.strptime(nc.RangeBeginningDate, '%Y-%m-%d')
+    #         nc_start_date = dt.datetime(nc_dates[0].year, nc_dates[0].month, nc_dates[0].day, nc_dates[0].hour, nc_dates[0].minute, 0)
+    #         nc_end_date = dt.datetime(nc_dates[0].year, nc_dates[0].month+1, nc_dates[0].day, nc_dates[0].hour, nc_dates[0].minute, 0)
+    #         # nc_end_date = nc_start_date + dt.timedelta(days=1)
+    #         # hours_interval = int(24/nc.dimensions['time'].size)  # TODO: FIX ME
+    #         hours_interval = 10
+    #         nc_dates = list(rrule.rrule(rrule.HOURLY, interval=hours_interval, dtstart=nc_start_date, until=nc_end_date))
+    #         nc_dates = np.array(nc_dates)
+    #         nc_dates = nc_dates[:-1]
+    #
+    #     # find the requested date in the file
+    #     time_index = np.where(nc_dates == requested_date)[0]
+    #     if time_index.size == 0:
+    #         raise Exception('unnetcdf_MERRA2', 'requested time {} can not be found in the netcdf file {}'.format(requested_date, nc_file_path))
+    #     time_index = time_index[0]
+    #
+    #     return time_index
 
-        for var_key in var_list:
-            print('processing variable {}'.format(var_key))
-            nc_var_key = _FIELD_MAP[var_key].netcdf_var_key  # key in EMAC
 
-            # deduce is it a surface or model levels file
-            n_vert_levels = 1
-            f = f_sfc
-            if _FIELD_MAP['level'] in nc.variables[nc_var_key].dimensions:
-                n_vert_levels = nc.dimensions[_FIELD_MAP['level']].size
-                f = f_ml
+    # time_index = get_time_index_in_netcdf(nc)  # nc specific implementation
 
-            for level_index in range(n_vert_levels):
-                print('processing level {}'.format(level_index))
-                nc_data = prepare_nc_data(nc, _FIELD_MAP, var_key, time_index, level_index, LATLON_PROJECTION)
+    for var_key in var_list:
+        print('processing variable {}'.format(var_key))
+        nc_var_key = _FIELD_MAP[var_key].netcdf_var_key  # key in EMAC
 
-                if _FIELD_MAP[var_key].override_time:
-                    # in general the date has to be identical, but constant fields may prescribe it for the wrong date
-                    nc_data['time_data'] = requested_date
-                    nc_data['hdate'] = format_hdate(requested_date)
-                    print('date was overridden for the var_key {}'.format(var_key))
+        # deduce is it a surface or model levels file
+        n_vert_levels = 1
+        f = f_sfc
+        if _FIELD_MAP['level'] in df.variables[nc_var_key].dims:
+            n_vert_levels = df.dims[_FIELD_MAP['level']]
+            f = f_ml
 
-                wrf_write(f, nc_data)
+        for level_index in range(n_vert_levels):
+            detailed_print('processing level {}'.format(level_index), args.detailed_debug)
+            nc_data = prepare_nc_data(df, _FIELD_MAP, var_key, level_index, LATLON_PROJECTION)
 
-                # print("startlat: {}, deltalat: {}".format(nc_data['startlat'], nc_data['deltalat']))
-                # print("startlon: {}, deltalon: {}".format(nc_data['startlon'], nc_data['deltalon']))
+            if _FIELD_MAP[var_key].override_time:
+                # in general the date has to be identical, but constant fields may prescribe it for the wrong date
+                nc_data['time_data'] = requested_date
+                nc_data['hdate'] = format_hdate(requested_date)
+                print('date was overridden for the var_key {}'.format(var_key))
+
+            wrf_write(f, nc_data)
 
     print('Closing file ' + out_file_name_sfc)
     f_sfc.close()
