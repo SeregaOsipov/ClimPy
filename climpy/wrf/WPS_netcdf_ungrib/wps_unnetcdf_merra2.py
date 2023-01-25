@@ -1,4 +1,5 @@
 import argparse
+import xarray as xr
 import netCDF4
 import numpy as np
 import datetime as dt
@@ -25,7 +26,9 @@ These are some of the MERRA2 docs for quick reference
 2. https://gmao.gsfc.nasa.gov/pubs/docs/Reichle541.pdf
 
 Run command example:
-python -u ${CLIMATE_MODELLING}/WRF/WPS_netcdf_ungrib/wps_unnetcdf_merra2.py --start_date=2017-09-02 --end_date=2018-09-01 >& log.unnetcdf_extension
+python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_merra2.py --start_date=2022-11-18 --end_date=2023-01-01 >& log.unnetcdf_aread4
+
+TODO: replace MERRA2 predownloading with the OpenDAP access
 '''
 
 
@@ -95,47 +98,28 @@ for requested_date in requested_dates:
         var_list = dataset['vars']
         print('DATA SET is {} and the list of variables to process is {}'.format(dataset['name'], dataset['vars']))
 
-        nc_file_path = get_merra2_file_path(dataset['name'], requested_date)
-        nc = netCDF4.Dataset(nc_file_path)
+        nc_file_path, is_df_time_invariant = get_merra2_file_path(dataset['name'], requested_date)
+        # df = netCDF4.Dataset(nc_file_path)
+
+        time_dependent_df = xr.open_dataset(nc_file_path)
+        if is_df_time_invariant:  # time invariant data sets should only have one element in time dimension
+            df = time_dependent_df.isel(time=0)
+        else:  # Ocean data are 30 minutes shifted relative to atmosphere. Allow 30 minutes tolerance
+            df = time_dependent_df.sel(time=requested_date, drop=True, method='nearest', tolerance=np.timedelta64(30,'m'))  # do the time selection.
+            df['time'] = requested_date  # have to store the date somewhere
 
         # deduce is it a surface or model levels file
         n_vert_levels = 1
         f = f_sfc
-        if _FIELD_MAP['level'] in nc.dimensions.keys():
-            n_vert_levels = nc.dimensions[_FIELD_MAP['level']].size
+        if _FIELD_MAP['level'] in df.dims.keys():
+            n_vert_levels = df.dims[_FIELD_MAP['level']]
             f = f_ml
-
-        def get_time_index_in_netcdf(nc):
-            # check if it is the time invariant dataset (constants)
-            if 'Time-invariant' in nc.LongName:
-                return 0
-
-            # reading the actual time stamps causes issues, since we have instantaneous and time average fields
-            # nc_dates = convert_time_data_impl(nc.variables['time'][:], nc.variables['time'].units)
-
-            # instead generate time and use the fact that all file_paths are daily
-            nc_start_date = dt.datetime.strptime(nc.RangeBeginningDate, '%Y-%m-%d')
-            nc_end_date = nc_start_date + dt.timedelta(days=1)
-            hours_interval = int(24/nc.dimensions['time'].size)
-            nc_dates = list(rrule.rrule(rrule.HOURLY, interval=hours_interval, dtstart=nc_start_date, until=nc_end_date))
-            nc_dates = np.array(nc_dates)
-            nc_dates = nc_dates[:-1]
-
-            # find the requested date in the file
-            time_index = np.where(nc_dates == requested_date)[0]
-            if time_index.size == 0:
-                raise Exception('unnetcdf_MERRA2', 'requested time {} can not be found in the netcdf file {}'.format(requested_date, nc_file_path))
-            time_index = time_index[0]
-
-            return time_index
-
-        time_index = get_time_index_in_netcdf(nc)
 
         for var_key in var_list:
             print('processing variable {}'.format(var_key))
             for level_index in range(n_vert_levels):
                 print('processing level {}'.format(level_index))
-                nc_data = prepare_nc_data(nc, _FIELD_MAP, var_key, time_index, level_index, LATLON_PROJECTION)
+                nc_data = prepare_nc_data(df, _FIELD_MAP, var_key, level_index, LATLON_PROJECTION)
 
                 if _FIELD_MAP[var_key].override_time:
                     # in general the date has to be identical, but constant fields may prescribe it for the wrong date

@@ -5,6 +5,7 @@ import numpy as np
 import xarray as xr
 import sys
 from climpy.utils.time_utils import to_datetime
+from climpy.utils.merra_utils import derive_merra2_pressure_profile
 
 __author__ = 'Sergey Osipov <Serheadega.Osipov@gmail.com>'
 
@@ -110,29 +111,16 @@ def convert_unit_ratio_to_percents(nc_data, nc, level_index):
     nc_data['units'] = '%'
 
 
-def derive_land_sea_merra2(nc_data, nc, time_index, level_index):
-    water_fraction = nc.variables['FROCEAN'][time_index] + nc.variables['FRLAKE'][time_index]
+def derive_land_sea_merra2(nc_data, nc, level_index):
+    water_fraction = nc.variables['FROCEAN'] + nc.variables['FRLAKE']
     nc_data['slab'] = np.zeros(water_fraction.shape)
     ind = water_fraction < 0.5
     nc_data['slab'][ind] = 1
 
 
-def derive_3d_pressure_merra2(nc_data, nc, time_index, level_index):
-    # To get the pressure for a selected layer I still have to build the entire 3d field first
-    # TODO: use derive_merra2_pressure_stag_profile from merra_utils.py
-    # see this doc for details on Vertical Structure https://gmao.gsfc.nasa.gov/pubs/docs/Bosilovich785.pdf
-    layer_pressure_thickness = nc.variables['DELP'][time_index]  # 3d
-
-    # summation has to start from the top, p_top is fixed to 1 Pa
-    pressure_stag_no_toa = 1 + np.cumsum(layer_pressure_thickness, axis=0)
-    # new shape
-    stag_shape = (pressure_stag_no_toa.shape[0]+1,) + pressure_stag_no_toa.shape[1:]
-    pressure_stag = np.empty(stag_shape)
-    pressure_stag[0, :, :] = 1  # fixed p_top
-    pressure_stag[1:, :, :] = pressure_stag_no_toa
-
-    # get the pressure at the rho grid
-    pressure_rho = (pressure_stag[1:] + pressure_stag[:-1])/2
+def derive_3d_pressure_merra2(nc_data, nc, level_index):
+    # To get the pressure for a selected layer, I still have to build the entire 3d field first
+    pressure_stag, pressure_rho = derive_merra2_pressure_profile(nc)
     nc_data['slab'] = pressure_rho[level_index]
 
 
@@ -142,7 +130,7 @@ def interpolate_soil_temperatures_merra2(nc_data, nc, time_index, level_index):
 
     # //TODO: this function will be executed every time, think how to accelerate it if performance is poor
     # derive the MERRA2 soil vertical grid
-    lnd_const_nc_file_path = get_merra2_file_path('const_2d_lnd_Nx', dt.datetime(1, 1, 1))
+    lnd_const_nc_file_path, is_time_invariant = get_merra2_file_path('const_2d_lnd_Nx', dt.datetime(1, 1, 1))
     lnd_const_nc = netCDF4.Dataset(lnd_const_nc_file_path)
 
     merra_soil_layer_thickness = np.empty((6,) + lnd_const_nc.variables['dzgt1'].shape[1:])  # m
@@ -504,7 +492,8 @@ def prepare_nc_data(df, _FIELD_MAP, var_key, level_index, map_projection_version
         nc_data['slab'][np.logical_not(ind)] = 0
         nc_data['units'] = '0/1 Flag'
 
-    nc_data['slab'] = nc_data['slab'].to_numpy()  # once all is done (pre & pp processing), convert DF to numpy
+    if hasattr(nc_data['slab'], 'to_numpy') and callable(nc_data['slab'].to_numpy):  # if xarray variable, then convert to numpy
+        nc_data['slab'] = nc_data['slab'].to_numpy()  # once all is done (pre & pp processing), convert DF to numpy
 
     return nc_data
 
@@ -605,14 +594,19 @@ def get_merra2_file_path(dataset_name, requested_date):
     MERRA2_STORAGE_PATH = '/work/mm0062/b302074/Data/NASA/MERRA2/'
     name_prefix = 'MERRA2_400.'
     date_str = '.' + requested_date.strftime('%Y%m%d') + '.'
+
+    is_time_invariant = False
+
     if 'const_2d_asm' in dataset_name:
         name_prefix = 'MERRA2_101.'
         date_str = '.00000000.'
+        is_time_invariant = True
     elif 'const_2d_lnd' in dataset_name:
         name_prefix = 'MERRA2_100.'
         date_str = '.00000000.'
+        is_time_invariant = True
     nc_file_path = MERRA2_STORAGE_PATH + '/' + dataset_name + '/' + name_prefix + dataset_name + date_str + 'nc4'
-    return nc_file_path
+    return nc_file_path, is_time_invariant
 
 
 def get_emac_file_path(emac_folder, sim_label, dataset_name, requested_date, multifile_support, multifile_support_on_daily_output):
