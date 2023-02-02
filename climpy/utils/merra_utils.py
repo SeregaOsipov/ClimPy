@@ -30,9 +30,10 @@ def derive_merra2_pressure_profile(df):
     # derive the pressure at the rho grid from stag grid
     pressure_rho = pressure_stag.rolling(lev=2).mean().dropna('lev')
 
+    pressure_rho = pressure_rho.rename('p_rho')
+    pressure_stag = pressure_stag.rename('p_stag')
 
     # sort in a manner consistent with the input df
-    pressure_stag = pressure_stag.rename('p_stag')
     # pressure_stag.reindex_like(df)
 
     pressure_stag = pressure_stag.sortby('lev', ascending=False)  # set TOA as last year

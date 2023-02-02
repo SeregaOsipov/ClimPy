@@ -59,7 +59,7 @@ _FIELD_MAP_ECMWF_OA_2_WRF = {
                 }
 
 # The mapping for MERRA2
-# the post-processing for this maps includes:
+# the post-processing for these maps includes:
 # 0. PRECOMPUTE pressure to avoid calc_emcwf_p.exe
 # 1. Check that it is OK to mix 3D RH and 2m specific humidity
 
@@ -126,16 +126,20 @@ def derive_land_sea_merra2(nc_data, df, level_index):
     nc_data['slab'] = nc_data['slab'].where(water_fraction >= 0.5, 1)
 
 
-def derive_3d_pressure_merra2(nc_data, nc, level_index):
+def derive_3d_pressure_merra2(nc_data, df, level_index):
     # To get the pressure for a selected layer, I still have to build the entire 3d field first
-    pressure_stag, pressure_rho = derive_merra2_pressure_profile(nc)
+    pressure_stag, pressure_rho = derive_merra2_pressure_profile(df)
+
+    # bug preventive measure. Check that pressure is sorted correctly: surface to TOA
+    if not all(pressure_rho.lev.to_numpy() == pressure_rho.lev.sortby('lev', ascending=False).to_numpy()):  # in MERRA2 first layer by index is TOA
+        raise Exception('wps_unnetcdf_utils:sample_3d_pressure_at_layer_merra2. Pressure profile should be sorted from BOA to TOA')
+
     nc_data['slab'] = pressure_rho[level_index]
 
 
 def interpolate_soil_temperatures_merra2(nc_data, nc, time_index, level_index):
 
     # //TODO: this function is not implemented yet
-
     # //TODO: this function will be executed every time, think how to accelerate it if performance is poor
     # derive the MERRA2 soil vertical grid
     lnd_const_nc_file_path, is_time_invariant = get_merra2_file_path('const_2d_lnd_Nx', dt.datetime(1, 1, 1))
@@ -464,7 +468,6 @@ def prepare_nc_data(df, _FIELD_MAP, var_key, level_index, map_projection_version
         nc_data['slab'] = np.flip(nc_data['slab'], axis=0)
 
     # fill the missing values according to the METGRID.TBL
-    # if isinstance(nc_data['slab'], xr.Variable) and nc_data['slab'].isnull().any():
     if nc_data['slab'].isnull().any():
         missing_value = -1.E30
         nc_data['slab'] = nc_data['slab'].fillna(missing_value)

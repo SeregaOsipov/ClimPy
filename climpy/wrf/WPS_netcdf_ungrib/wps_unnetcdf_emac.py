@@ -123,45 +123,6 @@ for requested_date in requested_dates:
 
     print('The list of variables to process is {}'.format(var_list))
 
-    # nc_file_path = get_file_path_impl(args.emac_in, args.emac_sim_label, dataset['name'], requested_date, use_multifile_support, multifile_support_on_daily_output)
-    # if use_multifile_support or multifile_support_on_daily_output:
-    #     nc = netCDF4.MFDataset(nc_file_path)
-    # else:
-    #     nc = netCDF4.Dataset(nc_file_path)
-
-
-    # def get_time_index_in_netcdf(nc):
-    #     # check if it is the time invariant dataset (constants)
-    #     # TODO: check
-    #     # if 'Time-invariant' in nc.LongName:
-    #     #     return 0
-    #
-    #     nc_dates = convert_time_data_impl(nc['time'], nc['time'].units)
-    #
-    #     generate_dates = False
-    #     if generate_dates:  # instead generate time and use the fact that all file_paths are daily
-    #         # reading the actual time stamps causes issues, since we have instantaneous and time average fields
-    #         # nc_start_date = dt.datetime.strptime(nc.RangeBeginningDate, '%Y-%m-%d')
-    #         nc_start_date = dt.datetime(nc_dates[0].year, nc_dates[0].month, nc_dates[0].day, nc_dates[0].hour, nc_dates[0].minute, 0)
-    #         nc_end_date = dt.datetime(nc_dates[0].year, nc_dates[0].month+1, nc_dates[0].day, nc_dates[0].hour, nc_dates[0].minute, 0)
-    #         # nc_end_date = nc_start_date + dt.timedelta(days=1)
-    #         # hours_interval = int(24/nc.dimensions['time'].size)  # TODO: FIX ME
-    #         hours_interval = 10
-    #         nc_dates = list(rrule.rrule(rrule.HOURLY, interval=hours_interval, dtstart=nc_start_date, until=nc_end_date))
-    #         nc_dates = np.array(nc_dates)
-    #         nc_dates = nc_dates[:-1]
-    #
-    #     # find the requested date in the file
-    #     time_index = np.where(nc_dates == requested_date)[0]
-    #     if time_index.size == 0:
-    #         raise Exception('unnetcdf_MERRA2', 'requested time {} can not be found in the netcdf file {}'.format(requested_date, nc_file_path))
-    #     time_index = time_index[0]
-    #
-    #     return time_index
-
-
-    # time_index = get_time_index_in_netcdf(nc)  # nc specific implementation
-
     for var_key in var_list:
         print('processing variable {}'.format(var_key))
         nc_var_key = _FIELD_MAP[var_key].netcdf_var_key  # key in EMAC

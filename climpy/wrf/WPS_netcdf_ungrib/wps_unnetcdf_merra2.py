@@ -83,9 +83,8 @@ datasets = (dataset_2d_const, dataset_2d, dataset_2d_ocn, dataset_2d_land, datas
 for requested_date in requested_dates:
     print('Processing date {}'.format(requested_date))
 
-    # create output file_paths: sfc & ml
-    # they will be destroyed, if the already exist
-    # if you nondestructive logic - do it here
+    # create output file_paths: sfc & ml. Existing files will be destroyed
+    # if you want nondestructive logic - implement it here
     out_file_name_sfc = out_storage_path + '/FILE_unnc_' + 'sfc' + ':' + requested_date.strftime('%Y-%m-%d_%H')
     print('Creating file ' + out_file_name_sfc)
     f_sfc = open(out_file_name_sfc, 'wb')
@@ -99,7 +98,6 @@ for requested_date in requested_dates:
         print('DATA SET is {} and the list of variables to process is {}'.format(dataset['name'], dataset['vars']))
 
         nc_file_path, is_df_time_invariant = get_merra2_file_path(dataset['name'], requested_date)
-        # df = netCDF4.Dataset(nc_file_path)
 
         time_dependent_df = xr.open_dataset(nc_file_path)
         if is_df_time_invariant:  # time invariant data sets should only have one element in time dimension
