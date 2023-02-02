@@ -111,11 +111,19 @@ def convert_unit_ratio_to_percents(nc_data, nc, level_index):
     nc_data['units'] = '%'
 
 
-def derive_land_sea_merra2(nc_data, nc, level_index):
-    water_fraction = nc.variables['FROCEAN'] + nc.variables['FRLAKE']
-    nc_data['slab'] = np.zeros(water_fraction.shape)
-    ind = water_fraction < 0.5
-    nc_data['slab'][ind] = 1
+def derive_land_sea_merra2(nc_data, df, level_index):
+    '''
+    derive LANDSEA mask (1 is land, 0 is water)
+    :param nc_data:
+    :param df:
+    :param level_index:
+    :return:
+    '''
+
+    water_fraction = df.variables['FROCEAN'] + df.variables['FRLAKE']
+    nc_data['slab'] = df.variables['FROCEAN'].copy()
+    nc_data['slab'][:] = 0
+    nc_data['slab'] = nc_data['slab'].where(water_fraction >= 0.5, 1)
 
 
 def derive_3d_pressure_merra2(nc_data, nc, level_index):
@@ -314,7 +322,7 @@ _FIELD_MAP_MERRA_2_WRF = {
     # 'ST080150': WrfMetgridMapItem('TSOIL5', pp_impl=interpolate_soil_temperatures_merra2, read_in_pp_impl=True),
 
 
-    # The surface soil moisture (SFMC andGWETTOP) is the average soil moisture for the top DZSF=0.02 m of the soil.
+    # The surface soil moisture (SFMC and GWETTOP) is the average soil moisture for the top DZSF=0.02 m of the soil.
     # The root zone soil moisture variable, RZMC, ostensibly refers to the average amount of water ina nominal “root zone” of 1 meter depth
     #'SM000002': WrfMetgridMapItem('SFMC'),  # surface soil moisture (level 1), m**-3 m**-3
     #'SM000100': WrfMetgridMapItem('RZMC'),  # water root zone
@@ -456,13 +464,13 @@ def prepare_nc_data(df, _FIELD_MAP, var_key, level_index, map_projection_version
         nc_data['slab'] = np.flip(nc_data['slab'], axis=0)
 
     # fill the missing values according to the METGRID.TBL
-    if type(nc_data['slab']) is np.ma.MaskedArray:
+    # if isinstance(nc_data['slab'], xr.Variable) and nc_data['slab'].isnull().any():
+    if nc_data['slab'].isnull().any():
         missing_value = -1.E30
-        nc_data['slab'] = nc_data['slab'].filled(missing_value)
+        nc_data['slab'] = nc_data['slab'].fillna(missing_value)
         # print(var_key + ' has missing values, filling them with {}'.format(missing_value))
 
     # //TODO: code below is for EMCWF only and needs to be replaced with the pp_impl logic
-
     # reprocessing SURFACE field, see WPS rrpr.f
     if var_key == 'z':
         nc_data['slab'] /= 9.81

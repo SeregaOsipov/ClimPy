@@ -26,7 +26,7 @@ These are some of the MERRA2 docs for quick reference
 2. https://gmao.gsfc.nasa.gov/pubs/docs/Reichle541.pdf
 
 Run command example:
-python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_merra2.py --start_date=2022-11-18 --end_date=2023-01-01 >& log.unnetcdf_aread4
+python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_merra2.py --start_date=2022-10-25 --end_date=2023-01-01 >& log.unnetcdf_aread
 
 TODO: replace MERRA2 predownloading with the OpenDAP access
 '''
