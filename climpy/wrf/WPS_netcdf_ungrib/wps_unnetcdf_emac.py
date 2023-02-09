@@ -25,7 +25,7 @@ The script also performs several auxiliary steps:
 1. precomputes the 3d Pressure and thus calc_ecmwf_p.exe step is unnecessary
 2. Set ups the soil temperature and humidity profiles on the model grid. METGRID.TBL needs to be updated accordingly
 3. YOU NEED TO INCLUDE NEW SOIL VARIABLES INTO THE METGRID.TBL
-   METGRID.TBL.ARW.MERRA2 is provided as an example
+   METGRID.TBL.ARW.AQABA is provided as an example
 4. Soil moisture is implemented very sloppy due to poor land model in EMAC
 5. SST is probably replaced by the Skin Temperature
 
@@ -34,9 +34,10 @@ This is how to run script in the terminal:
 gogomamba
 python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py
 
-2050 example:
+EMME 2017 & 2050 examples:
 gogomamba
-python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py --emac_in=/work/mm0062/b302011/script/Osipov/simulations/AQABA_2050 --out=/work/mm0062/b302074/Data/AirQuality/EMME/2050/IC_BC/unnetcdf/ --start_date=2050-08-03_00 --end_date=2051-01-02_00 --emac_sim_label=test01_________
+year=2017  # 2050
+python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py --emac_in=/work/mm0062/b302074/Data/AirQuality/EMME/${year}/IC_BC/emac/ --out=/work/mm0062/b302074/Data/AirQuality/EMME/${year}/IC_BC/unnetcdf/ --start_date=${year}-01-01_00 --end_date=$((year))-01-02_00 --emac_sim_label=test01_________
 
 Ignore or update current default arguments  
 '''
