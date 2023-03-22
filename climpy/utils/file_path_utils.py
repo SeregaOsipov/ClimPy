@@ -7,8 +7,10 @@ STORAGE_PATH_MISTRAL = '/work/mm0062/b302074/'
 
 
 def get_root_storage_path_on_hpc():
-    path = STORAGE_PATH_SHAHEEN
-    if os.path.exists(STORAGE_PATH_MISTRAL):
+    path = os.path.expanduser('~')  # local first
+    if os.path.exists(STORAGE_PATH_SHAHEEN):
+        path = STORAGE_PATH_SHAHEEN
+    elif os.path.exists(STORAGE_PATH_MISTRAL + 'Data/'):
         path = STORAGE_PATH_MISTRAL
     return path
 

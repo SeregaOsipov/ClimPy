@@ -11,6 +11,12 @@ def derive_merra2_pressure_profile(df):
 
     # Build the entire 3d field first
     layer_pressure_thickness = df['DELP'].sortby('lev')  # sort to make sure that summation takes places from top
+
+    # bug preventive measure. Check that pressure sorting will not reverse relative to the parent array (MERRA sort from 1 layer at TOA to last layer at BOA)
+    if not all(df['DELP'].lev.to_numpy() == layer_pressure_thickness.lev.to_numpy()):  # in MERRA2 first layer by index is TOA
+        raise Exception('merra_utils:derive_merra2_pressure_profile. Pressure profile will likely be reversed')
+        # in this case precompute pressure first and them flip the entire MERRA2 df
+
     # summation has to start from the top, p_top is fixed to 1 Pa
     pressure_stag_no_toa = 1 + layer_pressure_thickness.cumsum(dim='lev')
 
@@ -35,9 +41,6 @@ def derive_merra2_pressure_profile(df):
 
     # sort in a manner consistent with the input df
     # pressure_stag.reindex_like(df)
-
-    pressure_stag = pressure_stag.sortby('lev', ascending=False)  # set TOA as last year
-    pressure_rho = pressure_rho.sortby('lev', ascending=False)  # set TOA as last year
 
     return pressure_stag, pressure_rho
 

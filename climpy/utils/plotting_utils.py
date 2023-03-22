@@ -86,10 +86,10 @@ def collocate_time_series(obs_var, obs_time, model_var, model_time, freq='10min'
     Bin two datasets into time intervals
     Usefull for scatter plots
     '''
-    obs_time_10min = pd.Series(obs_time).dt.round(freq=freq)
-    model_time_10min = pd.Series(model_time).dt.round(freq=freq)
+    obs_rounded_time = pd.Series(obs_time).dt.round(freq=freq)
+    model_rounded_time = pd.Series(model_time).dt.round(freq=freq)
     # sample both data sets at the same time
-    d1, obs_ind, model_ind = np.intersect1d(obs_time_10min, model_time_10min, return_indices=True)
+    d1, obs_ind, model_ind = np.intersect1d(obs_rounded_time, model_rounded_time, return_indices=True)
 
     collocated_obs_var = obs_var[obs_ind]
     collocated_model_var = model_var[model_ind]

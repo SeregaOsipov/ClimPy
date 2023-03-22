@@ -55,14 +55,15 @@ def get_rayleigh_optical_properties(rayleigh_od_da, pf_cos_angle):
 
     op_ds_rayleigh = xr.Dataset(
         data_vars=dict(
-            od=(["level", "wavelength"], rayleigh_od_da.data),
-            ssa=(["level", "wavelength"], ssa),
-            g=(["level", "wavelength"], g),
-            phase_function=(["level", "wavelength", "angle"], phase_function),
+            od=(["level", 'wavenumber'], rayleigh_od_da.data),
+            ssa=(["level", 'wavenumber'], ssa),
+            g=(["level", 'wavenumber'], g),
+            phase_function=(["level", 'wavenumber', "angle"], phase_function),
         ),
         coords=dict(
             level=(['level', ], rayleigh_od_da.level.data),
-            wavelength=(['wavelength', ], rayleigh_od_da.wavelength.data),
+            wavenumber=(['wavenumber', ], rayleigh_od_da.wavenumber.data),
+            wavelength=(['wavenumber', ], rayleigh_od_da.wavelength.data),
             angle=(['angle', ], pf_cos_angle),  # op_ds actually stores cos of angles as "angle" variable
         ),
         attrs=dict(description="Rayleigh optical properties"),
@@ -71,6 +72,33 @@ def get_rayleigh_optical_properties(rayleigh_od_da, pf_cos_angle):
     return op_ds_rayleigh
 
 
-def mix_optical_properties():
-    return None
+def mix_optical_properties(ops, externally=True):
+    '''
+    Mix optical properties using the external mixture rules
+    :param ops: list of op_ds
+    :param externally:
+    :return:
+    '''
+
+    bulk_ds = xr.concat(ops, dim='species')
+    # aod is just a sum
+    od_ds = bulk_ds.od.sum(dim='species')
+    # ssa is weighted by extinction
+    weights = bulk_ds.od/bulk_ds.od.sum(dim='species')
+    weights.name = 'weight'
+    ssa_ds = bulk_ds.ssa.weighted(weights).sum(dim='species')
+    # g and phase function are weighted by extinction * ssa
+    od_times_ssa_ds = bulk_ds.od * bulk_ds.ssa
+    weights = od_times_ssa_ds / od_times_ssa_ds.sum(dim='species')
+    weights.name = 'weight'
+    if weights.isnull().any():
+        weights = weights.fillna(0)
+        print('mix_optical_properties: replacing missing weights with 0. This could happen when SSA is exactly zero. Otherwise, search for an error.')
+    g_ds = bulk_ds.g.weighted(weights).sum(dim='species')
+    pf_ds = bulk_ds.phase_function.weighted(weights).sum(dim='species')
+
+    # put everything back together
+    ds = xr.merge((od_ds, ssa_ds, g_ds, pf_ds))
+
+    return ds
 

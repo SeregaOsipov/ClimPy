@@ -129,12 +129,7 @@ def derive_land_sea_merra2(nc_data, df, level_index):
 def derive_3d_pressure_merra2(nc_data, df, level_index):
     # To get the pressure for a selected layer, I still have to build the entire 3d field first
     pressure_stag, pressure_rho = derive_merra2_pressure_profile(df)
-
-    # bug preventive measure. Check that pressure is sorted correctly: surface to TOA
-    if not all(pressure_rho.lev.to_numpy() == pressure_rho.lev.sortby('lev', ascending=False).to_numpy()):  # in MERRA2 first layer by index is TOA
-        raise Exception('wps_unnetcdf_utils:sample_3d_pressure_at_layer_merra2. Pressure profile should be sorted from BOA to TOA')
-
-    nc_data['slab'] = pressure_rho[level_index]
+    nc_data['slab'] = pressure_rho.isel(lev=level_index)
 
 
 def interpolate_soil_temperatures_merra2(nc_data, nc, time_index, level_index):
