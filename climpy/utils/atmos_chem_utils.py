@@ -1,6 +1,12 @@
+import os
+
 import numpy as np
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
+
+import xarray as xr
+
+from climpy.utils.lblrtm_utils import Gas
 
 
 def get_ozone_quantum_yield(wavelengths, temperature):
@@ -58,3 +64,60 @@ def get_ozone_quantum_yield(wavelengths, temperature):
     qy_vo['quantum_yield'] = qy
 
     return qy_vo
+
+
+def get_atmospheric_gases_composition():
+    '''
+    Prepare the atmospheric chem composition for LBLRTM and DISORT
+
+    LBLRTM gas units:
+
+    JCHAR = 1-6           - default to value for specified model atmosphere
+      = " ",A         - volume mixing ratio (ppmv):
+      = B             - number density (cm-3)
+      = C             - mass mixing ratio (gm/kg)
+      = D             - mass density (gm m-3)
+      = E             - partial pressure (mb)
+      = F             - dew point temp (K) *H2O only*
+      = G             - dew point temp (C) *H2O only*
+      = H             - relative humidity (percent) *H2O only*
+      = I             - available for user definition
+
+    '''
+    fp = '/work/mm0062/b302074/Data/NASA/GMI/gmiClimatology.nc'  # GMI climatology
+    fp = os.path.expanduser('~') + '/Data/NASA/GMI/gmiClimatology.nc'  # GMI climatology
+    ds = xr.open_dataset(fp)
+    # fix the metadata
+    ds = ds.set_coords({'lat', 'lon', 'level'})
+    ds = ds.swap_dims({'latitude_dim': 'lat', 'longitude_dim': 'lon', 'eta_dim': 'level'})
+    ds = ds.rename({'species_dim': 'species'})
+
+    species = []  # derive labels from netcdf
+    for index in range(ds.const_labels.shape[1]):
+        label = ''.join([r.item().decode().strip() for r in ds.const_labels[:,index]])
+        species += [label, ]
+
+    ds['species'] = (('species', ), species)
+
+    # SO2 is missing, setup dummy profile.
+    so2_ds = ds.sel(species=Gas.O2.value)  # Use O2 to make a single gas copy as a template for SO2
+    so2_ds.const[:]=0
+    so2_ds['species'] = (('species',), ['SO2',])
+
+    # CO2 is missing, setup 388.5 (as of june 2012).
+    co2_ds = ds.sel(species=Gas.O2.value)  # Use O2 to make a single gas copy as a template for SO2
+    co2_ds.const[:] = 388.5  # units A
+    co2_ds['species'] = (('species',), ['CO2', ])
+
+    ds = xr.concat([ds, so2_ds, co2_ds], 'species')
+    ds['time'] = np.arange(12)  # zero based indexing
+
+    ds = ds.drop(labels=('const_labels',))
+
+    # add units variable according to LBLRTM
+    ds['units'] = (('species',), ['A',]*ds.species.size)
+    ds.units.attrs['long_name'] = 'units according to LBLRTM'
+
+    return ds
+
+

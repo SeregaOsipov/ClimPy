@@ -31,3 +31,9 @@ def convert_file_path_mask_to_list(file_path_mask, N_parts=None):
         files_list = files_list[0:N_parts]
 
     return files_list
+
+
+def make_dir_for_the_full_file_path(full_file_path):
+    if not os.path.exists(os.path.dirname(full_file_path)):
+        print('Path {} does not exist. Creating directory.'.format(os.path.dirname(full_file_path)))
+        os.mkdir(os.path.dirname(full_file_path))

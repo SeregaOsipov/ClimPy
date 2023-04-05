@@ -1,5 +1,6 @@
 import numpy as np
 import scipy as sp
+
 from climpy.utils import mie_utils as mie
 from climpy.utils.diag_decorators import normalize_size_distribution_by_area
 
@@ -39,7 +40,7 @@ def get_Kok_dust_emitted_size_distribution(moment='dN'):
     print('Kok dVdlogd [0.2-20] area is {}'.format(np.trapz(dVdlogd[ind], logdd[ind])))
 
     vo = dNdlogd_vo
-    if moment is 'dV':
+    if moment == 'dV':
         vo = dVdlogd_vo
     return vo
 
@@ -79,3 +80,5 @@ def derive_aerosols_optical_properties(ri_vo, dA_vo):
     # column_od = np.sum(column_od_by_modes, axis=1)  # sum up modes
 
     return column_od
+
+

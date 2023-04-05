@@ -18,7 +18,7 @@ function rayleighOpticalPropertiesVO = getRayleighOpticalProperties(odData, wave
 '''
 
 
-def derive_rayleigh_phase_function(cos_theta):
+def derive_rayleigh_phase_function(angle_in_radians):
     '''
     The Rayleigh scattering phase function moments:
     # PMOM = single(zeros([NMOM+1, NLYR]));
@@ -27,13 +27,31 @@ def derive_rayleigh_phase_function(cos_theta):
     :return:
     '''
 
-    p = 3 / 4 * (1 + cos_theta**2)
+    pf = 3 / 4 * (1 + np.cos(angle_in_radians) ** 2)
+    pf = normalize_phase_function(pf, angle_in_radians)
 
-    return p
+    return pf
+
+def normalize_phase_function(pf, angle_in_radians):
+    # TODO: redo using Xarray
+    # normalize PF it to 1.  # https://miepython.readthedocs.io/en/latest/03a_normalization.html
+    mu = np.cos(angle_in_radians)
+    total = 2 * np.pi * np.trapz(pf, mu)
+    if mu[1] < mu[0]:  # 0 to pi angle, 1 to -1 cos(angle)
+        total *= -1  # Invert the sign due to reversed direction of integration.
+
+    # TODO: I'm not sure what the normalization for DISORT should be (1, ssa, 2pi, etc.)
+    total /= 2  # this is how norm was defined in the previous matlab code
+    pf /= total  # normalize to 1
+    return pf
 
 
 def derive_rayleigh_optical_properties(op_ds_w_rayleigh, op_ds_wo_rayleigh):
     '''
+
+    TODO: Would be better parametrize Rayleigh
+    E.g., Rayleigh scattering is following the Nicolet 1984 https://doi.org/10.1016/0032-0633(84)90089-8
+    https://doi.org/10.1175/1520-0426(1999)016%3C1854:ORODC%3E2.0.CO;2
 
     :param op_ds_w_rayleigh: is the LBLRTM with Rayleigh included
     :param op_ds_wo_rayleigh: the same, without Rayleigh scattering
@@ -41,16 +59,15 @@ def derive_rayleigh_optical_properties(op_ds_w_rayleigh, op_ds_wo_rayleigh):
     '''
     rayleigh_od_da = op_ds_w_rayleigh.od - op_ds_wo_rayleigh.od
     # TODO: maybe it is better do make a deep copy and edit from there
-    pf_cos_angle = op_ds_w_rayleigh.angle.data  # op_ds store the cos of angle as an angle
-    rayleigh_op_ds = get_rayleigh_optical_properties(rayleigh_od_da, pf_cos_angle)
+    rayleigh_op_ds = get_rayleigh_optical_properties(rayleigh_od_da, op_ds_w_rayleigh.angle.data)  # op_ds store the angle in radiance
 
     return rayleigh_op_ds
 
 
-def get_rayleigh_optical_properties(rayleigh_od_da, pf_cos_angle):
+def get_rayleigh_optical_properties(rayleigh_od_da, angle_in_radians):
     ssa = np.ones(rayleigh_od_da.shape)
     g = np.zeros(rayleigh_od_da.shape)  # alternative is to derive from PF
-    phase_function = derive_rayleigh_phase_function(pf_cos_angle)
+    phase_function = derive_rayleigh_phase_function(angle_in_radians)
     phase_function = np.tile(phase_function, rayleigh_od_da.shape[0:2] + (1,))
 
     op_ds_rayleigh = xr.Dataset(
@@ -64,7 +81,7 @@ def get_rayleigh_optical_properties(rayleigh_od_da, pf_cos_angle):
             level=(['level', ], rayleigh_od_da.level.data),
             wavenumber=(['wavenumber', ], rayleigh_od_da.wavenumber.data),
             wavelength=(['wavenumber', ], rayleigh_od_da.wavelength.data),
-            angle=(['angle', ], pf_cos_angle),  # op_ds actually stores cos of angles as "angle" variable
+            angle=(['angle', ], angle_in_radians),  # op_ds stores the angle in radiance
         ),
         attrs=dict(description="Rayleigh optical properties"),
     )
@@ -83,17 +100,20 @@ def mix_optical_properties(ops, externally=True):
     bulk_ds = xr.concat(ops, dim='species')
     # aod is just a sum
     od_ds = bulk_ds.od.sum(dim='species')
+
     # ssa is weighted by extinction
     weights = bulk_ds.od/bulk_ds.od.sum(dim='species')
     weights.name = 'weight'
+    if (bulk_ds.od.sum(dim='species')==0).any():  # then I will get NaN due to division by 0
+        weights = weights.fillna(0)
     ssa_ds = bulk_ds.ssa.weighted(weights).sum(dim='species')
+
     # g and phase function are weighted by extinction * ssa
     od_times_ssa_ds = bulk_ds.od * bulk_ds.ssa
     weights = od_times_ssa_ds / od_times_ssa_ds.sum(dim='species')
     weights.name = 'weight'
-    if weights.isnull().any():
+    if (od_times_ssa_ds.sum(dim='species')==0).any():  # then I will get NaNs due to division by 0
         weights = weights.fillna(0)
-        print('mix_optical_properties: replacing missing weights with 0. This could happen when SSA is exactly zero. Otherwise, search for an error.')
     g_ds = bulk_ds.g.weighted(weights).sum(dim='species')
     pf_ds = bulk_ds.phase_function.weighted(weights).sum(dim='species')
 
