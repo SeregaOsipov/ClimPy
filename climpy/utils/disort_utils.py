@@ -6,6 +6,7 @@ import xarray as xr
 import pvlib
 import scipy as sp
 from climpy.utils.file_path_utils import get_root_storage_path_on_hpc
+import metpy.constants as mpc
 
 '''
 The meteorologically significant spectral range extends from 300 nm to 3000nm (short-wave radiation). Approximately 96% of the complete extra-terrestrial radiation is situated within this spectral range.
@@ -240,7 +241,24 @@ def run_disort(op_rho_ds, atm_stag_ds, disort_setup_vo):
     )
 
     # pp
+    # net (down - up)
     disort_output_ds['down_minus_up_flux'] = disort_output_ds.direct_flux_down + disort_output_ds.diffuse_flux_down - disort_output_ds.diffuse_flux_up
+
+    # heating rate: dT/dt = g/cp * dF/dp. Where:
+    # g is acceleration due to gravity.
+    # cp is the specific heat of dry air at constant pressure
+    # F is net (down - up) flux
+
+    dp = disort_output_ds.level.diff(dim='level')
+    dF = disort_output_ds.down_minus_up_flux.diff(dim='level')
+    dFdp = dF/dp  # this will provide exact (accurate) results at rho grid
+    # dFdp = disort_output_ds.down_minus_up_flux.differentiate(coord='level')  # This will be at stag grid, due to approximation of the direvative
+
+    heating_rate = mpc.g.magnitude / mpc.dry_air_spec_heat_press.magnitude * 86400 * 10**-2 * dFdp
+    heating_rate *= -1  # invert sign due to reversed layer indexing (p is decreasing)
+    heating_rate = heating_rate.rename({'level':  'level_rho'})
+    disort_output_ds['heating_rate'] = heating_rate
+    disort_output_ds.heating_rate.attrs['units'] = 'K/day'
 
     return disort_output_ds
 

@@ -26,7 +26,7 @@ AER_SUPPORTED_GASES = [Gas.H2O, Gas.CO2, Gas.O3, Gas.N2O, Gas.CO, Gas.CH4, Gas.O
 
 
 class LblrtmSetup(object):  # TODO: Temp dummy settings
-    def __init__(self, DVOUT=1):
+    def __init__(self, DVOUT=10):
         self.DVOUT = DVOUT  # cm^-1
         self.zenithAngle = 180  # 0
 
@@ -329,6 +329,7 @@ def run_lblrtm(lblrtm_scratch_fp, lblrtm_setup_vo, atm_stag_ds, gases_ds, cross_
 
 def run_lblrtm_over_spectral_range(wn_range, lblrtm_scratch_fp, atm_stag_ds, gases_ds, cross_sections, lblrtm_setup_vo, include_Rayleigh_extinction=False):
     '''
+    Remember that LBLRTM represent rho layer and optical properties of these layers.
     Work with wavenumbers instead of WLs. Wavenumbers in cm^-1. Wavelengths in um.
 
     # atm_ds (MERRA2) is on the staggered grid. Derived the profile on the rho grid
