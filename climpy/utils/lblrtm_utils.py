@@ -170,14 +170,13 @@ def write_settings_to_tape(tape_fp, lblrtm_setup_vo, atm_stag_ds, gases_ds, cros
 
     for j in range(abs(IBMAX)):
         format = '%10.3f'
-        if j % 8 == 7:
-            format = '%10.3f\n'
+        if j % 8 == 7 or j == abs(IBMAX)-1:
+            format += '\n'
         if IBMAX > 0:
             tape.write(format % (atm_stag_ds.z[j] / 10 ** 3))  # altitudes of LBLRTM layer boundaries
         else:
             tape.write(format % atm_stag_ds.p[j])
-
-    tape.write('\n')
+    # tape.write('\n')
 
     IMMAX = len(atm_stag_ds.p)  # number of atmospheric profile boundaries
     IMMAX = IBMAX
@@ -194,11 +193,11 @@ def write_settings_to_tape(tape_fp, lblrtm_setup_vo, atm_stag_ds, gases_ds, cros
         IPRFL = 0
         IXSBIN = 0
         tape.write('%5d%5d%5d\n' % (IXMOLS, IPRFL, IXSBIN))
-        for specie in cross_sections.species:
+        for specie_index, specie in enumerate(cross_sections.species):
             gas_ds = cross_sections.sel(species=specie)
             format = '%10s'
-            if j % 8 == 7:
-                format = '%10s\n'
+            if specie_index % 8 == 7:
+                format += '\n'
             tape.write(format % specie.item())
         tape.write('\n')
 
@@ -214,7 +213,7 @@ def write_settings_to_tape(tape_fp, lblrtm_setup_vo, atm_stag_ds, gases_ds, cros
         for layer_index in range(LAYX):
             if IZORP==0:  # z, km
                 tape.write('%10.3f%5s' % (atm_stag_ds.z[layer_index], ''))
-            else: # pressure, hPa
+            else:  # pressure, hPa
                 tape.write('%10.3f%5s' % (gas_ds.level[layer_index], ''))
             # output units first
             for specie in cross_sections.species:
@@ -224,11 +223,11 @@ def write_settings_to_tape(tape_fp, lblrtm_setup_vo, atm_stag_ds, gases_ds, cros
                     raise Exception('LBLRTM crosssections: LBL only accepts 1 or A units here')
             tape.write('\n')
             # now output densities
-            for specie in cross_sections.species:
+            for specie_index, specie in enumerate(cross_sections.species):
                 gas_ds = cross_sections.sel(species=specie)
                 format = '%10.3E'
-                if j % 8 == 7:
-                    format = '%10.3E\n'
+                if specie_index % 8 == 7:
+                    format = '+\n'
                 tape.write(format % gas_ds.const[layer_index])
             tape.write('\n')
 

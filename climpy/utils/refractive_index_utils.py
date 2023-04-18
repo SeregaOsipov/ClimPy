@@ -1,6 +1,7 @@
 import functools
 import netCDF4
 import numpy as np
+import xarray as xr
 from climpy.utils.file_path_utils import get_root_storage_path_on_hpc
 from climpy.utils.wrf_chem_made_utils import get_aerosols_stack
 from climpy.utils.wrf_chem_utils import get_aerosols_keys, get_molecule_key_from_aerosol_key
@@ -84,6 +85,45 @@ def get_dust_ri():
     ri_vo['wl'] = wl
     return ri_vo
 
+
+def get_dust_WRF_Stenchikov_ri():
+    '''
+    The WRF and Stenchikov specific version of dust RI
+    Suleiman provided the number. These are not default!
+    :return:
+    '''
+
+    wn_stag_lw = np.array([10, 350, 500, 630, 700, 820, 980, 1080, 1180, 1390, 1480, 1800, 2080, 2250, 2380, 2600, 3250])  # this is non-default
+    wn_stag_sw = np.array([820, 2600, 3250, 4000, 4650, 5150, 6150, 7700, 8050, 12850, 16000, 22650, 29000, 38000, 50000])
+
+    # LW
+    ri_real = np.array([2.340,2.904,1.748,1.508,1.911,1.822,2.917,1.557,1.242,1.447,1.432,1.473,1.495,1.5,1.5,1.51])  # Real
+    ri_imag = np.array([0.7,0.857,0.462,0.263,0.319,0.26,0.65,0.373,0.093, 0.105,0.061,0.0245,0.011,0.008,0.0068,0.018])  # Imaginary
+
+    ri_lw = ri_real + 1j*ri_imag
+    ri_sw = np.array((1.55 + 1j * 10**-3,)*(len(wn_stag_sw)-3))  # drop first 3 values due to SW & LW overlap
+    wn_stag_lw_sw = np.concatenate((wn_stag_lw, wn_stag_sw[3:]))
+
+    ri_ds = xr.Dataset(
+        data_vars=dict(
+            ri=(['wavenumber'], np.concatenate((ri_lw, ri_sw))),
+        ),
+        coords=dict(
+            wavenumber_stag=(['wavenumber_stag', ], wn_stag_lw_sw),
+            # wavenumber=(['wavenumber', ], wn_stag_lw_sw.rolling(lev=2).mean()),
+            # wavelength=(['wavenumber', ], rayleigh_od_da.wavelength.data),
+        ),
+        attrs=dict(description="Dust Refractive Index"),
+    )
+
+    ri_ds['wavenumber'] = ri_ds.wavenumber_stag.rolling(wavenumber_stag=2).mean().dropna('wavenumber_stag').data
+    ri_ds['wavelength'] = 10**4 / ri_ds['wavenumber']
+    # ri_ds = ri_ds.set_coords('wavelength')
+
+    #make it backward compatible for a while
+    # ri_ds['wl'] = ri_ds['wavelength']
+
+    return ri_ds
 
 @correct_ri_sign_convention
 def get_spectral_refractive_index(chem_key, wavelengths):
