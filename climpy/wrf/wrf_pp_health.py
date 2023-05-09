@@ -11,6 +11,11 @@ from climpy.utils.wrf_chem_made_utils import get_aerosols_stack
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
+'''
+https://pubs.geoscienceworld.org/sepm/jsedres/article/71/3/365/114077/aerodynamic-and-geometric-diameters-of-airborne
+Conventionally, an aerodynamic diameter is taken as a product of the geometric diameter and the square root of particle density.
+'''
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", help="pycharm")
 parser.add_argument("--port", help="pycharm")
