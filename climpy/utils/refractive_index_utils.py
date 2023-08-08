@@ -3,7 +3,7 @@ import netCDF4
 import numpy as np
 import xarray as xr
 from climpy.utils.file_path_utils import get_root_storage_path_on_hpc
-from climpy.utils.wrf_chem_made_utils import get_aerosols_stack
+from climpy.utils.wrf_chem_made_utils import get_aerosols_pm_stack
 from climpy.utils.wrf_chem_utils import get_aerosols_keys, get_molecule_key_from_aerosol_key
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
@@ -16,15 +16,12 @@ def interpolate_ri_in_wavelength(func):
         if 'wavelengths' in kwargs:
             wavelengths = kwargs.pop('wavelengths')
 
-        vo = func(*args, **kwargs)
+        ds = func(*args, **kwargs)
 
         if wavelengths is not None:
-            # interpolate RI onto internal wavelength grid
-            ri = np.interp(wavelengths, vo['wl'], vo['ri'])  # ri = real+1j*imag
-            vo['ri'] = ri
-            vo['wl'] = wavelengths
+            ds = ds.interp(wavelength=wavelengths, kwargs={"fill_value": (ds.isel(wavelength=0), ds.isel(wavelength=-1))},)
 
-        return vo
+        return ds
     return wrapper_decorator
 
 
@@ -35,15 +32,18 @@ def correct_ri_sign_convention(func):
         if 'sign_convention' in kwargs:
             sign_convention = kwargs.pop('sign_convention')
 
-        vo = func(*args, **kwargs)
+        ds = func(*args, **kwargs)
 
         if sign_convention is not None and sign_convention == 'negative':
-            if vo['ri'] is np.array:
-                ri = [ri.real - 1j * ri.imag for ri in vo['ri']]
-            else:
-                ri = vo['ri'].real - 1j * vo['ri'].imag
-            vo['ri'] = ri
-        return vo
+            if isinstance(ds, xr.DataArray):
+                ds = ds.real - 1j * ds.imag
+            else:  # TODO: replace everything with xarray
+                if ds['ri'] is np.array:
+                    ri = [ri.real - 1j * ri.imag for ri in ds['ri']]
+                else:
+                    ri = ds['ri'].real - 1j * ds['ri'].imag
+                ds['ri'] = ri
+        return ds
     return wrapper_decorator
 
 
@@ -80,10 +80,8 @@ def get_dust_ri():
     ri_real = np.array([1.54, 1.54, 1.602])
     ri_imag = np.array([15*10**-4, 6*10**-4, 0.28])
 
-    ri_vo = {}
-    ri_vo['ri'] = ri_real + 1j * ri_imag
-    ri_vo['wl'] = wl
-    return ri_vo
+    ri_ds = xr.DataArray(data=ri_real + 1j * ri_imag, dims='wavelength', coords=dict(wavelength=wl), name='ri')
+    return ri_ds
 
 
 def get_dust_WRF_Stenchikov_ri():
@@ -185,7 +183,7 @@ def get_spectral_refractive_index(chem_key, wavelengths):
     return ri_vo
 
 
-def mix_refractive_index(nc, chem_opt, wavelengths=None):
+def mix_refractive_index(xr_in, chem_opt, wavelengths=None):
     '''
     WRF specific implementation
     Compute the volume-weighted refractive for the entire column
@@ -197,13 +195,12 @@ def mix_refractive_index(nc, chem_opt, wavelengths=None):
         wavelengths = np.array([0.3, 0.4, 0.6, 0.999])  # default WRF wavelengths in SW
 
     aerosols_keys_wet = get_aerosols_keys(chem_opt, wet=True)
-    aerosols_stack, dummy = get_aerosols_stack(nc, aerosols_keys_wet)  # , pm_sizes=[d_min, d_max], combine_modes=True, combine_organics=True, combine_sea_salt=True, convert_to_stp=True)
+    aerosols_stack, dummy = get_aerosols_pm_stack(xr_in, aerosols_keys_wet)  # , pm_sizes=[d_min, d_max], combine_modes=True, combine_organics=True, combine_sea_salt=True, convert_to_stp=True)
 
     # the weight will be aerosols mass, integrate vertically
-    z_stag = nc['PH'][:] + nc['PHB'][:] / 9.8
-    dz = np.diff(z_stag, axis=1)  # m
-    z_dim = aerosols_stack.shape.index(nc.dimensions['bottom_top'].size)  # deduce z_dim index
-    weights = np.sum(aerosols_stack*dz, axis=z_dim)  # ug / m^2
+    z_stag = (xr_in['PH'] + xr_in['PHB']) / 9.8
+    dz = z_stag.diff(dim='bottom_top_stag').rename({'bottom_top_stag': 'bottom_top'})  # m
+    weights = (aerosols_stack*dz).sum(dim='bottom_top')  # ug / m^2
 
     ri_vos = []
     ris = []
@@ -213,12 +210,11 @@ def mix_refractive_index(nc, chem_opt, wavelengths=None):
         ri_vos.append(ri)
         ris.append(ri['ri'])
 
-    # reshape RIs to match the array shapes, dims: chem, time, wl
-    ris = np.tile(np.array(ris), weights.shape[1:] + (1, 1))
-    ris = np.moveaxis(ris, -2, 0)
-    weights = np.tile(weights[..., np.newaxis], (wavelengths.shape[0],))
+    ris = xr.DataArray(data=np.array(ris), dims=['aerosol', 'wavelength'])
+    ris['aerosol'] = weights.aerosol
+    ris['wavelength'] = wavelengths
 
-    ri_volume_weighted = np.average(ris, weights=weights, axis=0)  # apply weights for averaging
-    ri_vo = {'ri': ri_volume_weighted, 'wl': wavelengths}
+    volume_weighted_ri_ds = ris.weighted(weights).mean(dim='aerosol').to_dataset(name='ri')
+    # volume_weighted_ri_ds['wavelength'] = wavelengths
 
-    return ri_vo
+    return volume_weighted_ri_ds

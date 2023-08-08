@@ -37,10 +37,10 @@ def get_mie_efficiencies(ri, r_data, wavelength, phase_function_angles_in_radian
             m = m.real - 1j * np.abs(m.imag)
             x = 2 * np.pi * r_data[r_index] / wavelength[wl_index]
             # efficiencies are without units, area will be in um^2
-            qext[wl_index, r_index], qsca[wl_index, r_index], qback, g[wl_index, r_index] = mp.mie(m,x)
+            qext[wl_index, r_index], qsca[wl_index, r_index], qback, g[wl_index, r_index] = mp.mie(m.item(),x.item())
 
             # compute the phase function
-            phase_function[wl_index, r_index, :] = mp.i_unpolarized(m, x, np.cos(phase_function_angles_in_radians))  # this is the phase function normalized to ssa
+            phase_function[wl_index, r_index, :] = mp.i_unpolarized(m.item(), x.item(), np.cos(phase_function_angles_in_radians))  # this is the phase function normalized to ssa
         # t_e = time.time()
         # print(t_e-t_s)
     # dummy checks
@@ -55,9 +55,9 @@ def get_mie_efficiencies(ri, r_data, wavelength, phase_function_angles_in_radian
             phase_function=(["wavenumber", 'radius', "angle"], phase_function),
         ),
         coords=dict(
-            radius=(['radius', ], r_data),
-            wavelength=(['wavenumber', ], wavelength),
-            wavenumber=(['wavenumber', ], 10**4/wavelength),
+            radius=(['radius', ], r_data.data),
+            wavelength=(['wavenumber', ], wavelength.data),
+            wavenumber=(['wavenumber', ], 10**4/wavelength.data),
             angle=(['angle', ], phase_function_angles_in_radians),
         ),
         attrs=dict(description="Optical properties for a given size distribution"),

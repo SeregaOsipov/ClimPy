@@ -29,6 +29,8 @@ Run command example:
 python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_merra2.py --start_date=2022-10-25 --end_date=2023-01-01 >& log.unnetcdf_aread
 
 TODO: replace MERRA2 predownloading with the OpenDAP access
+
+To process by month in parallel, use wps_unnetcdf_merra2_monthly.sh
 '''
 
 

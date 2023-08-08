@@ -44,6 +44,7 @@ class DisortSetup(object):
         self.TEMIS = 0  # TOA emissivity for Thernal
 
 
+
 def run_disort_spectral(op_ds, atm_stag_ds, disort_setup_vo, adaptive_thermal_emission=True):
     '''
     adaptive_thermal_emission: means that PLANK is turned on depending on the wl for the LW spectrum
@@ -319,7 +320,6 @@ def setup_viewing_geomtry(disort_setup_vo, lat, lon, date):
     # TODO: have to specify time zone: , tz=site.tz)
     # TODO: make it work with the set of coordinates
     solpos = pvlib.solarposition.get_solarposition(date, lat, lon, 0)
-
     disort_setup_vo.zenith_angle_degree = solpos['zenith'].iloc[0]
     disort_setup_vo.azimuth_angle_degree = solpos['azimuth'].iloc[0]
 

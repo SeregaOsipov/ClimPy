@@ -1,8 +1,10 @@
 import pandas as pd
 import numpy as np
+import xarray as xr
 import functools
 from climpy.utils.diag_decorators import pandas_time_interval_selection
 from climpy.utils.netcdf_utils import convert_time_data_impl
+from molmass import Formula
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
@@ -97,31 +99,6 @@ def combine_aerosol_keys_by_size_modes(aerosol_keys):
 # This was designed to work with MADE aerosol scheme
 
 
-def vstack_and_sort_aerosols(func):
-    @functools.wraps(func)
-    def wrapper_decorator(*args, **kwargs):
-
-        diags, aerosols_keys = func(*args, **kwargs)
-
-        # stack all species together
-        diags_vstack = np.stack(diags, axis=0)
-
-        return diags_vstack, aerosols_keys
-
-
-        # sort them, dims are species, time
-        ind = np.argsort(np.nansum(diags_vstack, axis=1))
-        # Reverse the sorted array
-        ind = ind[::-1]
-
-        ind_3d = np.repeat(ind[:, np.newaxis, :], diags_vstack.shape[1], axis=1)
-        np.take_along_axis(diags_vstack, ind_3d, axis=1).shape
-
-        return np.take_along_axis(diags_vstack, ind_3d, axis=1), np.array(aerosols_keys)[ind[:, 0]]
-
-    return wrapper_decorator
-
-
 def combine_aerosol_modes(func):
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
@@ -129,27 +106,30 @@ def combine_aerosol_modes(func):
         if 'combine_modes' in kwargs:
             combine_modes = kwargs.pop('combine_modes')
 
-        diags, aerosols_keys = func(*args, **kwargs)
+        pm_ds, aerosols_keys = func(*args, **kwargs)
 
-        diags_pp = diags
+        pm_ds_pp = pm_ds
         aerosols_keys_pp = aerosols_keys
 
         if combine_modes:  # merge two modes into one, for example, so4ai+so4aj = so4ai+j
-            diags_pp = []
+            pm_ds_pp = []
             aerosols_keys_pp = []
-            for key, diag in zip(aerosols_keys, diags):
-                # NOTE: this logic wil break, if the var names change
+            for key, diag_ds in zip(aerosols_keys, pm_ds):  # NOTE: this logic wil break, if the var names change
                 if key[-1] == 'i':
                     i_index = aerosols_keys.index(key[:-1] + "i")
                     j_index = aerosols_keys.index(key[:-1] + "j")
-                    diags_pp.append(diags[i_index] + diags[j_index])
+                    pm_ds_pp.append(pm_ds.isel(aerosol=i_index) + pm_ds.isel(aerosol=j_index))
                     aerosols_keys_pp.append(key[:-1]+' (i+j)')
                 elif key[-1] == 'j':
-                    continue  # it was proccessed by the previous case
+                    continue  # it was processed by the previous case
                 else:  # antha, seas, soila. Leave them as is
-                    diags_pp.append(diag)
+                    pm_ds_pp.append(diag_ds.reset_coords(names='aerosol', drop=True))  # drop the aerosol dimension to allow concatenation latter on
                     aerosols_keys_pp.append(key)
-        return diags_pp, aerosols_keys_pp
+
+            pm_ds_pp = xr.concat(pm_ds_pp, 'aerosol')
+            pm_ds_pp['aerosol'] = aerosols_keys_pp
+
+        return pm_ds_pp, aerosols_keys_pp
 
     return wrapper_decorator
 
@@ -165,33 +145,37 @@ def combine_aerosol_types(func):
         if 'combine_sea_salt' in kwargs:
             combine_sea_salt = kwargs.pop('combine_sea_salt')
 
-        diags, aerosols_keys = func(*args, **kwargs)
+        pm_ds, aerosols_keys = func(*args, **kwargs)
 
-        diags_pp = diags
+        pm_ds_pp = pm_ds
         aerosols_keys_pp = aerosols_keys
 
         if combine_organics or combine_sea_salt:  # merge organics org..1 + org..2 into org (1+2)
-            diags_pp = []
+            pm_ds_pp = []
             aerosols_keys_pp = []
             organics = []
             minerals = []
-            for key, diag in zip(aerosols_keys, diags):
+            for key, diag_ds in zip(aerosols_keys, pm_ds):
                 # simply group all organics into one bucket
                 # indices = [i for i, s in enumerate(aerosols_keys) if 'org' in s]
                 if combine_organics and (key[:3] == 'org' or key[:4] == 'asoa' or key[:4] == 'bsoa'):
-                    organics.append(diag)
+                    organics.append(diag_ds)
                 elif combine_sea_salt and (key == 'seas' or key[:3] == 'caa' or key[:2] == 'ka' or key[:3] == 'mga' or key[:3] == 'naa' or key[:3] == 'cla'):  # Ca, K, Mg
-                    minerals.append(diag)
+                    minerals.append(diag_ds)
                 else:  # everything else leave as is
-                    diags_pp.append(diag)
+                    pm_ds_pp.append(diag_ds.reset_coords(names='aerosol', drop=True))
                     aerosols_keys_pp.append(key)
             if len(organics) > 0:  # sum up organics
-                diags_pp.append(sum(organics))
+                pm_ds_pp.append(sum(organics).reset_coords(names='aerosol', drop=True))
                 aerosols_keys_pp.append('org (i+j)')
             if len(minerals) > 0:
-                diags_pp.append(sum(minerals))
+                pm_ds_pp.append(sum(minerals))
                 aerosols_keys_pp.append('seas*')  # caa+ka+mga+naa+cla
-        return diags_pp, aerosols_keys_pp
+
+            pm_ds_pp = xr.concat(pm_ds_pp, 'aerosol')
+            pm_ds_pp['aerosol'] = aerosols_keys_pp
+
+        return pm_ds_pp, aerosols_keys_pp
 
     return wrapper_decorator
 
@@ -210,25 +194,23 @@ def to_stp(func):
         if 'convert_to_stp' in kwargs:
             convert_to_stp = kwargs.pop('convert_to_stp')
 
-        diags, aerosols_keys = func(*args, **kwargs)
+        pm_ds, aerosols_keys = func(*args, **kwargs)
 
         if convert_to_stp is not None:
             print('Normalizing concentrations to STP')
 
-            nc = args[0]
+            xr_in = args[0]
             # TODO: check the height of the instruments
-            t = nc.variables['T2'][:]
-            p = nc.variables['PSFC'][:]*10**-2
+            t = xr_in.variables['T2'][:]
+            p = xr_in.variables['PSFC'][:]*10**-2
 
             p_stp = 1013.25
             t_stp = 273+20
             stp_correction_factor = p_stp/p * t/t_stp
-            print('stp correction min is {}, max is {}'.format(np.min(stp_correction_factor), np.max(stp_correction_factor)))
+            print('stp correction min is {}, max is {}'.format(stp_correction_factor.min().item(), stp_correction_factor.max().item()))
+            pm_ds *= stp_correction_factor
 
-            for diag in diags:
-                diag *= stp_correction_factor[:, np.newaxis]
-
-        return diags, aerosols_keys
+        return pm_ds, aerosols_keys
 
     return wrapper_decorator
 
@@ -355,3 +337,28 @@ def get_wrf_aod_at_aeronet_station(nc, var_key):
     return df
 
 
+def convert_wrf_ppmv_to_concentration(wrf_ds, chem_keys):
+    '''
+    Convert wrf output for trace gases in ppmv to ug/m3 for comparison with AQ stations
+
+    chem_keys = ['so2', 'no2', 'co', 'o3', 'ch4', 'tol', 'xyl']
+
+    :param wrf_ds:
+    :param chem_keys:
+    :return:
+    '''
+    for gas_key in chem_keys:
+        print('processing {}'.format(gas_key))
+        chem_formula = gas_key.upper()
+        if gas_key == 'tol':
+            chem_formula = 'C6H5CH3'
+        if gas_key == 'xyl':
+            chem_formula = 'C8H10'
+
+        conversation_factor = 10 ** 3 / (29 / Formula(chem_formula).mass) / wrf_ds['ALT']
+        wrf_ds[gas_key] = wrf_ds[gas_key] * conversation_factor # mmr: ug/kg, concentration : ug / m^3
+        wrf_ds[gas_key].attrs['units'] = 'ug m^{-3}'
+
+        print('{} ppmv -> ug m^-3 mean conversation factor is {}'.format(gas_key, conversation_factor.mean().values))
+
+    return wrf_ds

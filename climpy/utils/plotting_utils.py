@@ -8,7 +8,7 @@ import pandas as pd
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 
-MY_DPI = 96.0
+MY_DPI = 300
 
 
 def JGR_page_width_inches():
@@ -24,7 +24,6 @@ def save_figure_bundle(root_folder, file_name, vector_graphics=False):
     Saves figure in 3 formats, png dpi 600, svg and pdf
     :return:
     """
-    save_figure(root_folder, file_name + ' dpi 100', file_ext='png', dpi=100)  # I need it for faster latex compilation
     save_figure(root_folder, file_name, file_ext='png', dpi=300)
     save_figure(root_folder, file_name + ' dpi 600', file_ext='png', dpi=600)  # I need it for faster latex compilation
     if vector_graphics:

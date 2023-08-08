@@ -3,6 +3,8 @@ import numpy as np
 import functools
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
+from climpy.utils.file_path_utils import get_root_storage_path_on_hpc
+
 '''
 Socio-Economic / Macro parameters utils such UN, World Bank and so on 
 for params such as GNI, GDP, population, etc.
@@ -52,7 +54,7 @@ def inject_region_info(func):
 
 @inject_region_info
 def prep_gni():
-    file_path = '/work/mm0062/b302074/Data/AirQuality/EMME/projection/WorldBank/API_NY.GNP.ATLS.CD_DS2_en_csv_v2_3474000.csv'  # World Data # total
+    file_path = get_root_storage_path_on_hpc() + '/Data/WorldBank/API_NY.GNP.ATLS.CD_DS2_en_csv_v2_3474000.csv'  # World Data # total
     gni_df = pd.read_csv(file_path, header=2)  # , usecols=['Variant', 'Location', 'PopTotal', 'Time'])  # , index_col='Time'
     gni_df = gni_df.iloc[:, :-1]  # drop last column to ignore trailing comma
     gni_df.rename(columns={'Country Code': 'iso', 'Country Name': 'name'}, inplace=True)
@@ -67,7 +69,7 @@ def prep_gni():
 
 @inject_region_info
 def prep_gni_pre_capita():
-    file_path = '/work/mm0062/b302074/Data/AirQuality/EMME/projection/WorldBank/API_NY.GNP.PCAP.CD_DS2_en_csv_v2_3470973.csv'  # World Data # per capita
+    file_path = get_root_storage_path_on_hpc() + '/Data/WorldBank/API_NY.GNP.PCAP.CD_DS2_en_csv_v2_3470973.csv'  # World Data # per capita
     gni_per_capita_df = pd.read_csv(file_path, header=2)  # , usecols=['Variant', 'Location', 'PopTotal', 'Time'])  # , index_col='Time'
     gni_per_capita_df = gni_per_capita_df.iloc[:, :-1]  # drop last column to ignore trailing comma
     gni_per_capita_df.rename(columns={'Country Code': 'iso', 'Country Name': 'name'}, inplace=True)
@@ -76,7 +78,7 @@ def prep_gni_pre_capita():
 
 @inject_region_info
 def prep_population():
-    file_path = '/work/mm0062/b302074/Data/AirQuality/EMME/projection/WorldBank/API_SP.POP.TOTL_DS2_en_csv_v2_3469297.csv'
+    file_path = get_root_storage_path_on_hpc() + '/Data/WorldBank/API_SP.POP.TOTL_DS2_en_csv_v2_3469297.csv'
     population_df = pd.read_csv(file_path, header=2)  # , usecols=['Variant', 'Location', 'PopTotal', 'Time'])  # , index_col='Time'
     population_df = population_df.iloc[:, :-1]  # drop last column to ignore trailing comma
     population_df.rename(columns={'Country Code': 'iso', 'Country Name': 'name'}, inplace=True)
@@ -96,12 +98,16 @@ def prep_population():
 
 def prep_world_bank_meta_data():
     # %% Define the 8 regions following the World Bank classification
-    file_path = '/work/mm0062/b302074/Data/AirQuality/EMME/projection/WorldBank/Metadata_Country_API_NY.GNP.PCAP.CD_DS2_en_csv_v2_3470973.csv'  # World Data
+    file_path = get_root_storage_path_on_hpc() + '/Data/WorldBank/Metadata_Country_API_NY.GNP.PCAP.CD_DS2_en_csv_v2_3470973.csv'  # World Data
     meta_df = pd.read_csv(file_path, header=0)  # , usecols=['Variant', 'Location', 'PopTotal', 'Time'])  # , index_col='Time'
     meta_df = meta_df.iloc[:, :-1]  # drop last column
     meta_df.rename(columns={'Country Code': 'iso', 'TableName': 'name', 'Region': 'region'}, inplace=True)
-    wb_regions = meta_df['region'].unique()
-    wb_regions = np.delete(wb_regions, 1, 0)  # drop na, should be 7 regions in total
+    # wb_regions = meta_df['region'].unique()
+    # wb_regions = np.delete(wb_regions, 1, 0)  # drop na, should be 7 regions in total
+    wb_regions = list(meta_df['region'].unique())
+    wb_regions.remove(np.nan)
+
+    meta_df = meta_df[meta_df.region.isin(wb_regions)]  # drop the NaN regions from the meta_df
     wb_isos = meta_df['iso'].unique()
 
     return meta_df, wb_regions, wb_isos

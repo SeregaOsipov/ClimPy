@@ -534,9 +534,15 @@ def read_od_output(lblrtm_scratch_fp, n_layers_in_profile):
     od_item_shape = None
     for layer_index in range(n_layers_in_profile):
         od_file_path = '{}/ODint_{:03d}'.format(lblrtm_scratch_fp, layer_index+1)
+        tape6_file_path = '{}/TAPE6'.format(lblrtm_scratch_fp)
 
         spectral_item = None
         if os.path.exists(od_file_path):
+            # first check that it does not have any warnings
+            with open(tape6_file_path) as f:
+                if 'WARNING' in f.read():
+                    raise Exception('LBLRTM containts WARNINGS in TAPE6. Deal with them first.')
+
             v, spectral_item = read_tape11_output(od_file_path, 'double')
             v1 = v[0]
             v2 = v[1]

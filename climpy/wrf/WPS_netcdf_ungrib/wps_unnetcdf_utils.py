@@ -603,6 +603,9 @@ def get_merra2_file_path(dataset_name, requested_date):
 
     is_time_invariant = False
 
+    if requested_date.year == 2021 and requested_date.month >= 6 and requested_date.month <= 9:
+        name_prefix = 'MERRA2_401.'
+
     if 'const_2d_asm' in dataset_name:
         name_prefix = 'MERRA2_101.'
         date_str = '.00000000.'
@@ -611,6 +614,7 @@ def get_merra2_file_path(dataset_name, requested_date):
         name_prefix = 'MERRA2_100.'
         date_str = '.00000000.'
         is_time_invariant = True
+
     nc_file_path = MERRA2_STORAGE_PATH + '/' + dataset_name + '/' + name_prefix + dataset_name + date_str + 'nc4'
     return nc_file_path, is_time_invariant
 

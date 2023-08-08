@@ -7,7 +7,7 @@ from climpy.utils.atmos_utils import compute_column_from_vmr_profile
 import xarray as xr
 import argparse
 from climpy.utils.wrf_chem_utils import get_aerosols_keys
-from climpy.utils.wrf_chem_made_utils import get_aerosols_stack, get_wrf_size_distribution_by_modes
+from climpy.utils.wrf_chem_made_utils import get_wrf_size_distribution_by_modes
 from climpy.utils.refractive_index_utils import mix_refractive_index
 import climpy.utils.mie_utils as mie
 
@@ -19,10 +19,9 @@ Currently only column AOD for MADE only (log-normal pdfs)
 '''
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--mode", help="pycharm")
-parser.add_argument("--port", help="pycharm")
-parser.add_argument("--wrf_in", help="wrf input file path", default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v23/output/pp_wrf_optics/merge/wrfout_d01_monmean_regrid')
-parser.add_argument("--wrf_out", help="wrf output file path", default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v23/output/pp_wrf_optics/merge/wrfout_d01_monmean_regrid_optics')
+parser.add_argument("--mode", "--port", "--host", help="pycharm")
+parser.add_argument("--wrf_in", help="wrf input file path", default='/Users/osipovs/Data/AirQuality/EMME/2017/chem_100_v2/output/pp_optics/merge/wrfout_d01_timmean') #required=True)# default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v23/output/pp_wrf_optics/merge/wrfout_d01_monmean_regrid')
+parser.add_argument("--wrf_out", help="wrf output file path", default='/Users/osipovs/Data/AirQuality/EMME/2017/chem_100_v2/output/pp_optics/merge/wrfout_d01_timmean_optics') #required=True)#default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v23/output/pp_wrf_optics/merge/wrfout_d01_monmean_regrid_optics')
 args = parser.parse_args()
 
 print('Will process this WRF:\nin {}\nout {}'.format(args.wrf_in, args.wrf_out))
@@ -57,51 +56,49 @@ def export_to_netcdf(var, mode='a', is_var_time_dependent=True):
     var.load().to_netcdf(args.wrf_out, mode=mode, unlimited_dims=unlimited_dim, format='NETCDF4_CLASSIC')
 
 
-nc_in = netCDF4.Dataset(args.wrf_in)
+# nc_in = netCDF4.Dataset(args.wrf_in)
 xr_in = xr.open_dataset(args.wrf_in)
+xr_in = xr_in.rename({'XTIME': 'time', 'XLAT':'lat', 'XLONG':'lon'})#, 'west_east':'lon', 'south_north':'lat'})
 #%% Derive spectral column AOD
-# for now we will process everything in one go, may require a lot of memory
-# time_index = None  # equivalent to wrf.ALL_TIMES
-
-dA_vo = get_wrf_size_distribution_by_modes(nc_in, moment='dA', sum_up_modes=True, column=True)
-ri_vo = mix_refractive_index(nc_in, chem_opt, wavelengths)  # volume weighted RI
-
-
+ri_ds = mix_refractive_index(xr_in, chem_opt, wavelengths)  # volume weighted RI
+# ri_ds = ri_ds.rename({'XTIME': 'time', 'XLAT':'lat', 'XLONG':'lon', 'west_east':'lon', 'south_north':'lat'})
+dA_ds = get_wrf_size_distribution_by_modes(xr_in, moment='dA', sum_up_modes=True, column=True)
+# dA_ds = dA_ds.rename({'XTIME': 'time', 'XLAT':'lat', 'XLONG':'lon'})
 #%% serial implementation
 
 
-def derive_aerosols_optical_properties(ri_vo, dA_vo):
+def derive_aerosols_optical_properties(ri_ds, dA_ds):
     '''
     Use this for a single aerosols type and loop through the list
     Currently only extinction / optical depth
 
-    :param ri_vo: RI of the aerosols
-    :param dA_vo: cross-section area distribution
+    :param ri_ds: RI of the aerosols
+    :param dA_ds: cross-section area distribution
     :return:
     '''
 
     # Compute Mie extinction coefficients
     # dims are time, r, wl
-    qext = np.zeros(dA_vo['data'].shape + ri_vo['wl'].shape)
+    qext = np.zeros(dA_ds['dAdlogd'].shape + ri_ds['wavelength'].shape)
     qext[:] = np.NaN
-    for time_index in range(qext.shape[0]):
-        for lat_index in range(qext.shape[1]):  # range(5): #
+    for time_index in range(dA_ds.time.size):
+        for lat_index in range(dA_ds.lat.size):  # range(5): #
             print(lat_index)
-            for lon_index in range(qext.shape[2]):
+            for lon_index in range(dA_ds.lon.size):
                 # ri, r_data, wavelength = ri_vo['ri'][time_index], dA_vo['radii'], ri_vo['wl']
-                if not ri_vo['ri'].mask[time_index, lat_index, lon_index]:
-                    mie_vo = mie.get_mie_efficiencies(ri_vo['ri'][time_index, lat_index, lon_index], dA_vo['radii'], ri_vo['wl'])
-                    qext[time_index, lat_index, lon_index] = np.swapaxes(mie_vo['qext'], 0, 1)
+                # if not ri_ds.ri.mask[time_index, lat_index, lon_index]:
+                mie_ds = mie.get_mie_efficiencies(ri_ds.isel(time=time_index, south_north=lat_index, west_east=lon_index).ri, dA_ds['radius'], ri_ds['wavelength'])
+                qext[time_index, lat_index, lon_index] = np.swapaxes(mie_ds['qext'], 0, 1)
 
     # dims: time, r, wl & time, r
-    integrand = qext * dA_vo['data'][..., np.newaxis]
-    column_od = np.trapz(integrand, np.log(dA_vo['radii']), axis=-2)  # sd is already dAdlnr
+    integrand = qext * dA_ds['dAdlogd'][..., np.newaxis]
+    column_od = np.trapz(integrand, np.log(dA_ds['radii']), axis=-2)  # sd is already dAdlnr
     # column_od = np.sum(column_od_by_modes, axis=1)  # sum up modes
 
     return column_od
 
 
-column_od = derive_aerosols_optical_properties(ri_vo, dA_vo)
+column_od = derive_aerosols_optical_properties(ri_ds, dA_ds)
 
 print('DONE')
 exit()

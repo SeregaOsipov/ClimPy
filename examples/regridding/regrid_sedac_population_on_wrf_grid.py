@@ -1,8 +1,18 @@
 import numpy as np
 import xarray as xr
-import xesmf as xe
 import argparse
-from climpy.utils.modis_utils import get_modis_montly_file_paths, get_modis_var
+
+# this will fix the esmf import bug
+import os
+from pathlib import Path
+if 'ESMFMKFILE' not in os.environ:  # os.environ.get('READTHEDOCS') and
+    # RTD doesn't activate the env, and esmpy depends on a env var set there
+    # We assume the `os` package is in {ENV}/lib/pythonX.X/os.py
+    # See conda-forge/esmf-feedstock#91 and readthedocs/readthedocs.org#4067
+    print('fixing ESMFMKFILE env variable')
+    os.environ['ESMFMKFILE'] = str(Path(os.__file__).parent.parent / 'esmf.mk')
+#
+import xesmf as xe
 
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
@@ -13,11 +23,18 @@ Conservatively regrid SEDAC dataset onto WRF grid
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", help="pycharm")
+parser.add_argument("--host", help="pycharm")
 parser.add_argument("--port", help="pycharm")
 parser.add_argument("--wrf_in", help="wrf input file path")#, default='/work/mm0062/b302074/Data/AirQuality/AQABA/IC_BC/geo_em.d01.nc')
 parser.add_argument("--sedac_in", help="SEDAC file path")#, default='/work/mm0062/b302074/Data/NASA/SEDAC/population_density/gpw_v4_population_density_rev11_2pt5_min.nc')  # '/work/mm0062/b302074/Data/NASA/SEDAC/gpw_v4_population_count_adjusted_rev11_2pt5_min.nc')
 parser.add_argument("--sedac_out", help="regridded SEDAC output file path")#, default='/work/mm0062/b302074/Data/AirQuality/AQABA/IC_BC/aux/gpw_v4_population_density_rev11_2pt5_min.nc_regrid.nc')
 args = parser.parse_args()
+
+#%% local use case for WRF EMME sim & GHS population dataset
+# args.wrf_in = '/Users/osipovs/Data/AirQuality/AQABA/IC_BC/geo_em.d01.nc'
+# args.sedac_in = '/Users/osipovs/Data/GHSL/GHS_POP_E2020_GLOBE_R2023A_4326_30ss_V1_0/GHS_POP_E2020_GLOBE_R2023A_4326_30ss_V1_0_MENA.nc'  # regional
+# # args.sedac_in = '/Users/osipovs/Data/GHSL/GHS_POP_E2020_GLOBE_R2023A_4326_30ss_V1_0/GHS_POP_E2020_GLOBE_R2023A_4326_30ss_V1_0_test.nc'  # regional
+# args.sedac_out = '/Users/osipovs/Data/AirQuality/EMME/population/GHS_POP_E2020_GLOBE_R2023A_4326_30ss_V1_0_on_wrf_grid.nc'
 
 print('Will regrid this SEDAC onto this WRF:\nin {}\nout {}'.format(args.sedac_in, args.wrf_in))
 

@@ -221,19 +221,19 @@ def normalize_size_distribution_by_point(func):
         if 'sd_normalization_raduis' in kwargs:
             sd_normalization_raduis = kwargs.pop('sd_normalization_raduis')
 
-        vo = func(*args, **kwargs)
+        sd_ds = func(*args, **kwargs)
 
         if sd_normalization_raduis is not None:
-            # ind = vo['radii'] == sd_normalization_raduis
+            # ind = sd_ds['radii'] == sd_normalization_raduis
             # if not np.any(ind):
             # print('Cant find exact radii for normalization')
-            distance = np.abs((vo['radii'] - sd_normalization_raduis))
+            distance = np.abs((sd_ds['radii'] - sd_normalization_raduis))
             ind = distance.argmin()
-            # print('Instead searched for the closest {} given {}'.format(vo['radii'][ind], sd_normalization_raduis))
+            # print('Instead searched for the closest {} given {}'.format(sd_ds['radii'][ind], sd_normalization_raduis))
 
-            scale = 1 / vo['data'][:, ind]  # first dimension is time, second radius
-            vo['data'] *= scale[:, np.newaxis]
-        return vo
+            scale = 1 / sd_ds['data'][:, ind]  # first dimension is time, second radius
+            sd_ds['data'] *= scale[:, np.newaxis]
+        return sd_ds
     return wrapper_decorator
 
 
@@ -287,14 +287,17 @@ def derive_size_distribution_moment(func):
         if 'moment' in kwargs:
             moment = kwargs.pop('moment')
 
-        vo = func(*args, **kwargs)
+        sd_ds = func(*args, **kwargs)
 
         if moment is not None:
             if moment == 'dV':  # compute dV from dN
-                vo['data'] *= 4 / 3 * np.pi * vo['radii'] ** 3  # *= um**3
+                sd_ds['dNdlogd'] *= 4 / 3 * np.pi * sd_ds['radius'] ** 3  # *= um**3
+                sd_ds = sd_ds.rename({'dNdlogd': 'dVdlogd'})
             if moment == 'dA':  # compute dA from dN, geometric cross-section (not surface area)
-                vo['data'] *= np.pi * vo['radii'] ** 2  # *= um**2
+                sd_ds['dNdlogd'] *= np.pi * sd_ds['radius'] ** 2  # *= um**2
+                sd_ds = sd_ds.rename({'dNdlogd': 'dAdlogd'})
             if moment == 'dS':  # compute dS from dN, surface area (not geometric cross-section)
-                vo['data'] *= 4 * np.pi * vo['radii'] ** 2  # *= um**2
-        return vo
+                sd_ds['dNdlogd'] *= 4 * np.pi * sd_ds['radius'] ** 2  # *= um**2
+                sd_ds = sd_ds.rename({'dNdlogd': 'dSdlogd'})
+        return sd_ds
     return wrapper_decorator

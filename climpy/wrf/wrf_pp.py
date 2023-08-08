@@ -13,10 +13,9 @@ Script derives several common diagnostics from WRF output, such as SO2 & O3 colu
 '''
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--mode", help="pycharm")
-parser.add_argument("--port", help="pycharm")
-parser.add_argument("--wrf_in", help="wrf input file path")   # , default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v22/output/wrfout_d01_2017-06-15_00:00:00')
-parser.add_argument("--wrf_out", help="wrf output file path")  # , default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v22/output/pp_wrf/wrfout_d01_2017-06-15_00:00:00')
+parser.add_argument("--mode", "--port", "--host", help="pycharm")
+parser.add_argument("--wrf_in", help="wrf input file path" , default='/Users/osipovs/Data/AirQuality/AREAD/chem_100_v1/output/wrfout_d01_2022-11-01_00_00_00')
+parser.add_argument("--wrf_out", help="wrf output file path" , default='/Users/osipovs/Data/AirQuality/AREAD/chem_100_v1/output/pp_wrf/wrfout_d01_2022-11-01_00_00_00')
 args = parser.parse_args()
 
 wrf_in_file_path = args.wrf_in
@@ -59,6 +58,10 @@ time_index = wrf.ALL_TIMES  # process all in one go
 # print('processing step {} out of {}'.format(time_index, n_time_steps))
 # wrf_out_file_path = wrf_in_file_path + '_pp_{}'.format(time_index)  # comes from the arguments
 print('output will be saved into {}'.format(wrf_out_file_path))
+
+twb = wrf.getvar(nc_in, "twb", timeidx=time_index, squeeze=False)
+twb = twb.isel(bottom_top=0)  # keep the surface layer only
+export_to_netcdf(twb)  # , mode='w')
 
 slp = wrf.getvar(nc_in, "slp", timeidx=time_index, squeeze=False)
 export_to_netcdf(slp)  # , mode='w')
