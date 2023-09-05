@@ -34,11 +34,7 @@ To process by month in parallel, use wps_unnetcdf_merra2_monthly.sh
 '''
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--start_date", help="unnetcdf is similar to the WPS ungrib, provide the start and end dates in the YYYY-MM-DD format")
-parser.add_argument("--end_date", help="unnetcdf is similar to the WPS ungrib, provide the end date in the YYYY-MM-DD format")
-parser.add_argument("--mode", "--port", help="the are only to support pycharm debugging")
-args = parser.parse_args()
+
 
 out_storage_path = '/home/osipovs/workspace/WRF/Data/unnetcdf/'
 out_storage_path = '/project/k1090/osipovs/Data/NASA/MERRA2/unnetcdf/'

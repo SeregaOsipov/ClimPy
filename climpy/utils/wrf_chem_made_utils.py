@@ -271,7 +271,8 @@ def sample_WRF_MADE_size_distributions(sd_ds): # dp, sgs, dgs, m0s, m3s):
 
     return sd_ds
 
-def compute_MADE_bounded_distribution_factors(d_min, d_max, sgs, dgs, m3s, m0s):
+
+def compute_MADE_bounded_distribution_factors(d_min, d_max, sgs, dgs, m3s, m0s):  # TODO: maybe passing the sd_ds is better
     """
     Computes the Number and Volume factors, that represent the contribution of the size distribution
     to the total number of particles and volume for a given range of size.
@@ -392,7 +393,7 @@ def get_aerosols_pm_stack(xr_in, aerosols_keys, pm_size_range=None, pm_input_is_
         default = np.ones(xr_in.variables['ALT'].shape)
         V_factors = [default, default, default]  # array of ones
         if pm_size_range is not None:  # then compute the V factors for each aerosol type
-            sgs, dgs, m0s, m3s = get_wrf_sd_params(xr_in)
+            sd_ds = get_wrf_sd_params(xr_in)  # sgs, dgs, m0s, m3s
             d_min = pm_size_range[0]
             d_max = pm_size_range[1]
             # I have to compute the V factor for each aerosol type, because conversation to aerodynamic diameter involves density
@@ -401,7 +402,7 @@ def get_aerosols_pm_stack(xr_in, aerosols_keys, pm_size_range=None, pm_input_is_
                 rho = aerosol_densities_df.loc[rho_key].rho
                 d_min /= rho ** 0.5  # this still will be zero
                 d_max /= rho ** 0.5  # this will convert aerodynamic diameter to geometric
-            N_factors, V_factors = compute_MADE_bounded_distribution_factors(d_min, d_max, sgs, dgs, m3s, m0s)  # this input always requires geometric diameters
+            N_factors, V_factors = compute_MADE_bounded_distribution_factors(d_min, d_max, sd_ds.sgs, sd_ds.dgs, sd_ds.m3s, sd_ds.m0s)  # this input always requires geometric diameters
 
         # apply the PM factor (size correction)
         mode_index = MADE_mode_indices[key]

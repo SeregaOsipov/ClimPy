@@ -25,7 +25,21 @@ def inject_region_info(func):
         if 'keep_only_classified_regions' in kwargs:
             keep_only_classified_regions = kwargs.pop('keep_only_classified_regions')
 
+        rename_countries = True
+        if 'rename_countries' in kwargs:
+            rename_countries = kwargs.pop('rename_countries')
+
         df = func(*args, **kwargs)
+
+        if rename_countries:
+            # replace country names
+            df = df.replace('Egypt, Arab Rep.', 'Egypt')
+            df = df.replace('Iran, Islamic Rep.', 'Iran')
+            df = df.replace('Syrian Arab Republic', 'Syria')
+            df = df.replace('United Arab Emirates', 'UAE')
+            df = df.replace('Yemen, Rep.', 'Yemen')
+            df = df.replace(to_replace=r'^.*Turkey.*$', value='Turkey', regex=True)  # best way to replace names
+            df = df.replace('Turkiye', 'Turkey')
 
         if wb_meta_df is not None:
             wb_isos = wb_meta_df['iso'].unique()
@@ -53,6 +67,20 @@ def inject_region_info(func):
 
 
 @inject_region_info
+def prep_gdp():
+    file_path = get_root_storage_path_on_hpc() + '/Data/WorldBank/GDP/50b0a69e-6b7f-44bd-be3f-c32b843474b8_Data.csv'
+    df = pd.read_csv(file_path, skipfooter=5)#, header=2)  # , usecols=['Variant', 'Location', 'PopTotal', 'Time'])  # , index_col='Time'
+    df.rename(columns={'Country Code': 'iso', 'Country Name': 'name'}, inplace=True)
+
+    mapping = {}
+    for year in np.arange(1960, 2050):
+        mapping['{} [YR{}]'.format(year, year)] = year
+    df.rename(columns=mapping, inplace=True)  # update years
+
+    return df
+
+
+@inject_region_info
 def prep_gni():
     file_path = get_root_storage_path_on_hpc() + '/Data/WorldBank/API_NY.GNP.ATLS.CD_DS2_en_csv_v2_3474000.csv'  # World Data # total
     gni_df = pd.read_csv(file_path, header=2)  # , usecols=['Variant', 'Location', 'PopTotal', 'Time'])  # , index_col='Time'
@@ -73,7 +101,6 @@ def prep_gni_pre_capita():
     gni_per_capita_df = pd.read_csv(file_path, header=2)  # , usecols=['Variant', 'Location', 'PopTotal', 'Time'])  # , index_col='Time'
     gni_per_capita_df = gni_per_capita_df.iloc[:, :-1]  # drop last column to ignore trailing comma
     gni_per_capita_df.rename(columns={'Country Code': 'iso', 'Country Name': 'name'}, inplace=True)
-
     return gni_per_capita_df
 
 @inject_region_info

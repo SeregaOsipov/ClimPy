@@ -21,7 +21,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--mode", help="pycharm")
 parser.add_argument("--port", help="pycharm")
 parser.add_argument("--host", help="pycharm")
-parser.add_argument("--wrf_in", help="wrf input file path", default='/work/mm0062/b302074/Data/AirQuality/AREAD/chem_100_v1/output/wrfout_d01_2022-11-01_00_00_00')  # default='/work/mm0062/b302074/Data/AirQuality/EMME/chem_100_v100/output/pp_wrf_health/boa/wrfout_d01_2017-06-15_00:00:00')
+parser.add_argument("--wrf_in", help="wrf input file path", default='/work/mm0062/b302074/Data/AirQuality/EMME/2050/CLE/chem_100_v1/output/wrfout_d01_2050-12-02_00_00_00')  # default='/work/mm0062/b302074/Data/AirQuality/EMME/chem_100_v100/output/pp_wrf_health/boa/wrfout_d01_2017-06-15_00:00:00')
 parser.add_argument("--wrf_out", help="wrf output file path", default='/work/mm0062/b302074/Data/AirQuality/AREAD/chem_100_v1/output/pp_health/wrfout_d01_2022-11-01_00_00_00')
 parser.add_argument("--pm_input_is_aerodynamic_diameter", help="True/False", type=strtobool, default=True)  # default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v15/output/pp_wrf_health/pm/wrfout_d01_2017-08-31_00:00:00'
 args = parser.parse_args()

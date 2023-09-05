@@ -9,7 +9,7 @@ import os
 
 from climpy.utils.debug_utils import detailed_print
 from climpy.wrf.WPS_netcdf_ungrib.wps_unnetcdf_utils import prepare_nc_data, wrf_write, \
-    get_merra2_file_path, LATLON_PROJECTION, format_hdate, _FIELD_MAP_EMAC_2_WRF, get_emac_file_path
+    get_merra2_file_path, LATLON_PROJECTION, format_hdate, _FIELD_MAP_EMAC_2_WRF, get_emac_file_path, WrfMetgridMapItem
 from climpy.utils.netcdf_utils import convert_time_data_impl
 
 
@@ -30,9 +30,7 @@ The script also performs several auxiliary steps:
 5. SST is probably replaced by the Skin Temperature
 
 
-This is how to run script in the terminal:
-gogomamba
-python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py
+How to run script in the terminal:
 
 EMME 2017 & 2050 examples:
 gogomamba
@@ -82,7 +80,8 @@ _FIELD_MAP = _FIELD_MAP_EMAC_2_WRF
 # dataset_g3b = {"name": "g3b", "vars": list(_FIELD_MAP.keys())[7:25]}
 
 var_list = list(_FIELD_MAP.keys())[0:25]
-streams = ('ECHAM5', 'e5vdiff', 'g3b', 'WRF_bc')
+# streams = ('ECHAM5', 'e5vdiff', 'g3b', 'WRF_bc')  # old format where EMAC groups output into its own streams
+streams = ('WRF_bc_met', 'WRF_bc_chem',)  # new format, where Andrea extracted everything related to WRF into dedicated streams
 
 # list of the all the datasets to process
 # datasets = (dataset_echam, dataset_e5vdiff, dataset_g3b)
@@ -125,7 +124,12 @@ for requested_date in requested_dates:
     print('The list of variables to process is {}'.format(var_list))
 
     for var_key in var_list:
-        print('processing variable {}'.format(var_key))
+        if isinstance(_FIELD_MAP[var_key], WrfMetgridMapItem):
+            print('processing variable {}'.format(var_key))
+        else:
+            print('Skipping {} var as auxiliary'.format(var_key))
+            continue
+
         nc_var_key = _FIELD_MAP[var_key].netcdf_var_key  # key in EMAC
 
         # deduce is it a surface or model levels file
