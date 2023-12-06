@@ -32,10 +32,17 @@ The script also performs several auxiliary steps:
 
 How to run script in the terminal:
 
-EMME 2017 & 2050 examples:
+EMME 2050 example:
 gogomamba
-year=2017  # 2050
-python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py --emac_in=/work/mm0062/b302074/Data/AirQuality/EMME/${year}/IC_BC/emac/ --out=/work/mm0062/b302074/Data/AirQuality/EMME/${year}/IC_BC/unnetcdf/ --start_date=${year}-01-01_00 --end_date=$((year))-01-02_00 --emac_sim_label=test01_________
+year=2050
+scenario=CLE  
+python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py --emac_in=/work/mm0062/b302074/Data/AirQuality/EMME/${year}/${scenario}/IC_BC/emac/ --out=/work/mm0062/b302074/Data/AirQuality/EMME/${year}/${scenario}/IC_BC/unnetcdf/ --start_date=${year}-01-01_00 --end_date=$((year+1))-01-02_00 --emac_sim_label=test01_________ >& log.unnetcdf_${year}_${scenario}
+
+EMME 2017 example:
+gogomamba
+year=2017
+scenario=
+python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_emac.py --emac_in=/work/mm0062/b302074/Data/AirQuality/EMME/${year}/${scenario}/IC_BC/emac/ --out=/work/mm0062/b302074/Data/AirQuality/EMME/${year}/${scenario}/IC_BC/unnetcdf/ --start_date=${year}-01-01_00 --end_date=$((year+1))-01-02_00 --emac_sim_label=test01_________ >& log.unnetcdf_${year}_${scenario}
 
 Ignore or update current default arguments  
 '''

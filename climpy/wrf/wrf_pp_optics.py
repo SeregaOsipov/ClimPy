@@ -20,8 +20,8 @@ Currently only column AOD for MADE only (log-normal pdfs)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", "--port", "--host", help="pycharm")
-parser.add_argument("--wrf_in", help="wrf input file path", default='/Users/osipovs/Data/AirQuality/EMME/2017/chem_100_v2/output/pp_optics/merge/wrfout_d01_timmean') #required=True)# default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v23/output/pp_wrf_optics/merge/wrfout_d01_monmean_regrid')
-parser.add_argument("--wrf_out", help="wrf output file path", default='/Users/osipovs/Data/AirQuality/EMME/2017/chem_100_v2/output/pp_optics/merge/wrfout_d01_timmean_optics') #required=True)#default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v23/output/pp_wrf_optics/merge/wrfout_d01_monmean_regrid_optics')
+parser.add_argument("--wrf_in", help="wrf input file path", default='/Users/osipovs/Data/AirQuality/EMME/2050/EDGAR_trend/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean') #required=True)# default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v23/output/pp_wrf_optics/merge/wrfout_d01_monmean_regrid')
+parser.add_argument("--wrf_out", help="wrf output file path", default='/Users/osipovs/Data/AirQuality/EMME/2050/EDGAR_trend/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean_optics') #required=True)#default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v23/output/pp_wrf_optics/merge/wrfout_d01_monmean_regrid_optics')
 args = parser.parse_args()
 
 print('Will process this WRF:\nin {}\nout {}'.format(args.wrf_in, args.wrf_out))
@@ -81,24 +81,43 @@ def derive_aerosols_optical_properties(ri_ds, dA_ds):
     # dims are time, r, wl
     qext = np.zeros(dA_ds['dAdlogd'].shape + ri_ds['wavelength'].shape)
     qext[:] = np.NaN
+    time_list = []
     for time_index in range(dA_ds.time.size):
-        for lat_index in range(dA_ds.lat.size):  # range(5): #
+        lat_list = []
+        for lat_index in range(dA_ds.south_north.size):  # range(5): #
             print(lat_index)
-            for lon_index in range(dA_ds.lon.size):
-                # ri, r_data, wavelength = ri_vo['ri'][time_index], dA_vo['radii'], ri_vo['wl']
-                # if not ri_ds.ri.mask[time_index, lat_index, lon_index]:
+            lon_list = []
+            for lon_index in range(dA_ds.west_east.size):
                 mie_ds = mie.get_mie_efficiencies(ri_ds.isel(time=time_index, south_north=lat_index, west_east=lon_index).ri, dA_ds['radius'], ri_ds['wavelength'])
                 qext[time_index, lat_index, lon_index] = np.swapaxes(mie_ds['qext'], 0, 1)
+                lon_list += [mie_ds, ]
+                # ds = mie_ds.expand_dims(dim=['time', 'south_north', 'west_east'])
+                # ds = ds.assign_coords(lon=(('south_north', 'west_east'), dA_ds.lon.isel(west_east=lon_index, south_north=lat_index).data.reshape(1,1)))
+                # ds = ds.assign_coords(lat=(['south_north', 'west_east'], dA_ds.lat.isel(west_east=lon_index, south_north=lat_index).data.reshape(1,1)))
+                # ds = ds.assign_coords(time=('time', dA_ds.time.isel(time=time_index).data.reshape(1)))
+                # ds = ds.rename({'lon': 'west_east', 'lat':'south_north'})
+            lat_list += [xr.concat(lon_list, dim='west_east'), ]
+        time_list+=[xr.concat(lat_list, dim='south_north'), ]
+    qext_ds = xr.concat(time_list, dim='time')
 
     # dims: time, r, wl & time, r
-    integrand = qext * dA_ds['dAdlogd'][..., np.newaxis]
-    column_od = np.trapz(integrand, np.log(dA_ds['radii']), axis=-2)  # sd is already dAdlnr
+    # integrand = qext * dA_ds['dAdlogd'][..., np.newaxis]
+    integrand = qext_ds * dA_ds['dAdlogd']
+    integrand = integrand.assign_coords(log_radius=('radius', np.log(dA_ds['radius'].data)))
+    # column_od_ds = np.trapz(integrand, np.log(dA_ds['radii']), axis=-2)  # sd is already dAdlnr
+    column_od_ds = integrand.qext.integrate(coord='log_radius')
     # column_od = np.sum(column_od_by_modes, axis=1)  # sum up modes
 
-    return column_od
+    return column_od_ds
 
 
-column_od = derive_aerosols_optical_properties(ri_ds, dA_ds)
+# debugging subset
+# dsize=15
+# ri_ds = ri_ds.isel(south_north=slice(0,dsize), west_east=slice(0,dsize))
+# dA_ds = dA_ds.isel(south_north=slice(0,dsize), west_east=slice(0,dsize))
+column_od_ds = derive_aerosols_optical_properties(ri_ds, dA_ds)
+
+column_od_ds.to_netcdf(args.wrf_out)#, mode=mode, unlimited_dims=unlimited_dim, format='NETCDF4_CLASSIC')
 
 print('DONE')
 exit()
@@ -109,7 +128,7 @@ exit()
 
 var_key = 'AOD'
 dims = (xr_in['ALT'].dims[0],) + xr_in['ALT'].dims[2:] + ('wavelength', )  # Unlimited dimension has to be first
-data = xr.Dataset({var_key: (dims, column_od)})
+data = xr.Dataset({var_key: (dims, column_od_ds)})
 
 data[var_key].attrs["long_name"] = 'Spectral column AOD'
 data[var_key].attrs["units"] = ""
@@ -176,31 +195,3 @@ print('DONE')
 #
 #
 # column_od = derive_aerosols_optical_properties(ri_vo, dA_vo)
-
-#%% Test ray
-#
-# import ray
-# ray.init()
-#
-# @ray.remote
-# def f(x):
-#     return x * x
-#
-# futures = [f.remote(i) for i in range(4)]
-# print(ray.get(futures)) # [0, 1, 4, 9]
-#
-# @ray.remote
-# class Counter(object):
-#     def __init__(self):
-#         self.n = 0
-#
-#     def increment(self):
-#         self.n += 1
-#
-#     def read(self):
-#         return self.n
-#
-# counters = [Counter.remote() for i in range(4)]
-# [c.increment.remote() for c in counters]
-# futures = [c.read.remote() for c in counters]
-# print(ray.get(futures)) # [1, 1, 1, 1]

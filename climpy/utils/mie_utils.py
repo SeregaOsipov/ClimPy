@@ -29,7 +29,7 @@ def get_mie_efficiencies(ri, r_data, wavelength, phase_function_angles_in_radian
     phase_function = np.empty(qext.shape + phase_function_angles_in_radians.shape)  # wl, r, angle
 
     for wl_index in range(len(wavelength)):
-        print('Wavelength {} out of {}'.format(wl_index, len(wavelength)))
+        # print('Wavelength {} out of {}'.format(wl_index, len(wavelength)))
         # t_s = time.time()
         for r_index in range(len(r_data)):
             m = ri[wl_index]

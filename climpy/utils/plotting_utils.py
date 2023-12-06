@@ -114,3 +114,14 @@ def get_default_colors_list():
     prop_cycle = plt.rcParams['axes.prop_cycle']
     colors = prop_cycle.by_key()['color']
     return colors
+
+
+
+def new_figure_1_3_impl():
+    fig, axes = plt.subplots(nrows=1, ncols=3, figsize=(1.5 * JGR_page_width_inches(), JGR_page_width_inches()), dpi=MY_DPI, constrained_layout=True)
+    return fig, axes
+
+
+def new_figure_3_3_impl(figsize=(1.5 * JGR_page_width_inches(), JGR_page_width_inches())):
+    fig, axes = plt.subplots(nrows=3, ncols=3, figsize=figsize, constrained_layout=True)  # , dpi=MY_DPI
+    return fig, axes

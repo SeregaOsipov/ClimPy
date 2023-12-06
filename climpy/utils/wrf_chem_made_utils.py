@@ -451,7 +451,6 @@ def rank_aerosols_contribution_to_the_mode(nc, aerosols_keys):
 
 
 @time_interval_selection
-# @geo_regions_time_averaging
 @normalize_size_distribution_by_point
 @derive_size_distribution_moment
 def get_wrf_size_distribution_by_modes(xr_in, sum_up_modes=False, column=False, r_grid_to_merge=None, derive_m3=False, chem_opt=None):  # , wet=True

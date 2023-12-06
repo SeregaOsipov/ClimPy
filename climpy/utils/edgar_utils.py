@@ -1,6 +1,9 @@
 import pandas as pd
+from numpy import dtype
 import numpy as np
+import xarray as xr
 import functools
+import datetime as dt
 from climpy.utils.world_bank_utils import inject_region_info
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
@@ -52,7 +55,11 @@ def aggregate_by_regions(func):
     @functools.wraps(func)
     def wrapper_decorator(*args, **kwargs):
         df = func(*args, **kwargs)
-        regional_df = df.groupby('region').aggregate(np.sum)
+
+        regional_df = df
+        if 'region' in df.columns:
+            print('Grouping By Region')
+            regional_df = df.groupby('region').aggregate(np.sum)  # TODO: maybe grouping should include more columns
 
         return regional_df
 
@@ -112,6 +119,9 @@ def prep_edgar_totals_by_region(pollutants, file_path_template, wb_meta_df, popu
     sensitivities = {}
     for pollutant in pollutants:  # pollutant = 'SO2'
         regional_df = prep_edgar_pollutant(pollutant, file_path_template, wb_meta_df=wb_meta_df, population_for_per_capita=population_for_per_capita)  # , wb_isos=wb_isos, wb_regions=wb_regions
+        # keep only year-columns
+        # regional_df = regional_df.drop(labels=[ 'IPCC-Annex', 'World Region', 'iso', 'name',], axis=1, errors='ignore')
+        regional_df = regional_df.select_dtypes(include='number')
         regional_df = regional_df.transpose()
 
         edgars[pollutant] = regional_df
@@ -128,4 +138,52 @@ def prep_edgar_totals_by_region(pollutants, file_path_template, wb_meta_df, popu
 
     return edgars, trends, rel_trends, growths_since_1970, sensitivities
 
+
+def prep_edgar_v61_totals(pollutants, file_path_template):
+    # debug
+    # pollutants = EDGAR_AP_POLLUTANTS
+    # file_path_template = get_root_storage_path_on_hpc() + '/Data/emissions/EDGAR/v61_AP/{}/{}_1970_2018.xlsx'
+
+    edgars = []
+    for pollutant in pollutants:  # pollutant = 'SO2'
+        file_path = file_path_template.format(pollutant, pollutant, pollutant)
+        edgar_df = pd.read_excel(file_path, sheet_name='TOTALS BY COUNTRY', header=9, dtype=str)
+        # print('{} {}'.format(edgar_df.shape, pollutant))
+        # edgar_df = edgar_df.convert_dtypes()
+        # edgar_df.convert_dtypes().Country_code_A3
+        # edgar_df.Country_code_A3
+        mapping = {}
+        for year in np.arange(1970, 2019):
+            mapping['Y_{}'.format(year)] = year
+        edgar_df.rename(columns=mapping, inplace=True)  # update years, GHG only Y_year columns
+        for year in np.arange(1970, 2019):
+            edgar_df[year] = edgar_df[year].astype('float')
+        # for column in edgar_df.select_dtypes(exclude='number').columns:
+        #     edgar_df[column] = edgar_df[column].astype('str')
+        edgar_df = edgar_df.set_index('Country_code_A3')
+        # edgar_df = edgar_df.drop('Substance', axis=1)
+        edgars += [edgar_df, ]
+
+    # put pollutants into single ds
+    edgar_ds = xr.concat([df.to_xarray() for df in edgars], dim='pollutant')
+    edgar_ds = edgar_ds.set_coords(edgar_df.select_dtypes(exclude='number').columns)
+    for coord in edgar_df.select_dtypes(exclude='number').columns:
+        if 'pollutant' in edgar_ds[coord].dims:
+            edgar_ds[coord] = edgar_ds[coord].isel(pollutant=4)  # NOTE: remember that different pollutants have different countries
+
+    # merge time from individual variables
+    dvs = []
+    for dv in edgar_ds.data_vars:
+        dvs += [edgar_ds[dv], ]
+    edgar_ds = xr.concat(dvs, dim='time').to_dataset(name='emission')
+
+    edgar_ds = edgar_ds.assign_coords(pollutant=EDGAR_AP_POLLUTANTS)
+    dates = [dt.datetime(year, 1, 1) for year in edgar_df.select_dtypes(include='number').columns]
+    edgar_ds = edgar_ds.assign_coords(time=pd.to_datetime(dates))
+
+    for cv in edgar_ds.coords:
+        if edgar_ds[cv].dtype == dtype('O'):
+            edgar_ds[cv] = edgar_ds[cv].astype(str)
+
+    return edgar_ds
 
