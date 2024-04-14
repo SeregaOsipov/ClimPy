@@ -361,7 +361,7 @@ def define_MADE_modes_by_aerosol_type(aerosols_keys):
 @combine_aerosol_modes
 def get_aerosols_pm_stack(xr_in, aerosols_keys, pm_size_range=None, pm_input_is_aerodynamic_diameter=True):
     """
-    Computes the aerosols PM mass concentration. Note the difference between different diameters: aerodynamic, geometric, otpical, etc.
+    Computes the aerosols PM mass concentration. Note the difference between different diameters: aerodynamic, geometric, optical, etc.
     AQ stations measure PM2.5 in aerodynamic diameter.
 
     In WRF, we always work with geom diameters.

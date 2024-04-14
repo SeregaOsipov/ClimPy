@@ -53,3 +53,13 @@ def process_time_range_impl(time, time_range_vo):
     # newTimeData = timeData[timeSlice]
 
     return t_slice, new_time
+
+
+def xarray_time_to_fractional_day_of_year(time_da):
+    day_of_year = []
+    dates = pd.to_datetime(time_da.to_pandas().index)
+    for date in dates:
+        # add fractional part of the day to the integer day of year
+        day_of_year += [date.day_of_year + (date-dt.datetime(date.year, date.month, date.day))/dt.timedelta(1), ]
+
+    return day_of_year

@@ -15,6 +15,22 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 '''
 https://pubs.geoscienceworld.org/sepm/jsedres/article/71/3/365/114077/aerodynamic-and-geometric-diameters-of-airborne
 Conventionally, an aerodynamic diameter is taken as a product of the geometric diameter and the square root of particle density.
+
+
+Run like this:
+gogomamba
+campaign=THOFA
+sim_version=chem_100_v8
+campaign=AREAD
+sim_version=chem_100_v2
+
+local:
+wrf_output_folder=/home/osipovs/Data/AirQuality/$campaign/$sim_version/output/
+levante:
+wrf_output_folder=/work/mm0062/b302074/Data/AirQuality/$campaign/$sim_version/output/
+
+python -u ${CLIMPY}/climpy/wrf/wrf_pp_health.py --wrf_in=$wrf_output_folder/ship_track/wrf_ship_track.nc --wrf_out=$wrf_output_folder/ship_track/pp/wrf_ship_track.nc
+
 '''
 
 parser = argparse.ArgumentParser()
@@ -33,12 +49,9 @@ if args.pm_input_is_aerodynamic_diameter:
 
 chem_opt = 100
 aerosols_keys = get_aerosols_keys(chem_opt)
-
 #%%
 xr_in = xr.open_dataset(args.wrf_in)
-# sel BOA level
-xr_in_boa = xr_in.sel(bottom_top=0)
-# xr_in_boa = xr_in_boa.sel(Time=[0,1,2])  # DEBUG only
+xr_in_boa = xr_in.sel(bottom_top=0) #.sel(Time=[0,1,2])  # DEBUG only
 
 # compute PMs
 pm1_sizes = [1 * 10 ** -20, 1 * 10 ** -6]  # m, min max for integration
@@ -77,7 +90,8 @@ else:
 
 #%% Compute the UVI
 print('computing UV index')
-wrf_ds['UVI'] = xr_in_boa['PH_ERYTHEMA'] / 25 * 10 ** 3  # UVI = 1(25 mW m^-2) * integral (I*w*dlambda)
+if 'PH_ERYTHEMA' in xr_in_boa.variables.keys():
+    wrf_ds['UVI'] = xr_in_boa['PH_ERYTHEMA'] / 25 * 10 ** 3  # UVI = 1(25 mW m^-2) * integral (I*w*dlambda)
 
 #%% Make ds CDO complaint
 # for var_key in wrf_ds.variables:

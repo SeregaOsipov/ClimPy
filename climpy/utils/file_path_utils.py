@@ -3,16 +3,25 @@ import os
 from natsort import natsorted
 
 STORAGE_PATH_SHAHEEN = '/project/k1090/osipovs/'
-STORAGE_PATH_MISTRAL = '/work/mm0062/b302074/'
+STORAGE_PATH_LEVANTE = '/work/mm0062/b302074/'
+
+root_storage_path = None
+
+
+def set_env(env):
+    global root_storage_path
+    if env == 'local':
+        root_storage_path = os.path.expanduser('~')
 
 
 def get_root_storage_path_on_hpc():
-    path = os.path.expanduser('~')  # local first
-    if os.path.exists(STORAGE_PATH_SHAHEEN):
-        path = STORAGE_PATH_SHAHEEN
-    elif os.path.exists(STORAGE_PATH_MISTRAL + 'Data/'):
-        path = STORAGE_PATH_MISTRAL
-    return path
+    if root_storage_path is None:
+        path = os.path.expanduser('~')  # local first
+        if os.path.exists(STORAGE_PATH_SHAHEEN):
+            path = STORAGE_PATH_SHAHEEN
+        elif os.path.exists(STORAGE_PATH_LEVANTE + 'Data/'):
+            path = STORAGE_PATH_LEVANTE
+    return root_storage_path
 
 
 def get_pictures_root_folder():

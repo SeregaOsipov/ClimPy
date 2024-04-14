@@ -80,34 +80,26 @@ def plot_aeronet_stations_over_wrf_domain(wrf_nc_file_path, stations):
                 color=text_color, transform=crs.PlateCarree(),)
 
 
-def collocate_time_series(obs_var, obs_time, model_var, model_time, freq='10min', drop_nans=True, drop_zeros=False):
+def collocate_time_series(obs_ps, model_ps, freq='10min', drop_zeros=False):
     '''
     Bin two datasets into time intervals
     Usefull for scatter plots
     '''
-    obs_rounded_time = pd.Series(obs_time).dt.round(freq=freq)
-    model_rounded_time = pd.Series(model_time).dt.round(freq=freq)
-    # sample both data sets at the same time
-    d1, obs_ind, model_ind = np.intersect1d(obs_rounded_time, model_rounded_time, return_indices=True)
 
-    collocated_obs_var = obs_var[obs_ind]
-    collocated_model_var = model_var[model_ind]
-
-    # also drop nans
-    if drop_nans:
-        ind = np.logical_or(np.isnan(collocated_obs_var), np.isnan(collocated_model_var))
-        ind = np.logical_not(ind)
-        collocated_obs_var = collocated_obs_var[ind]
-        collocated_model_var = collocated_model_var[ind]
+    # obs_rounded_time = obs_ps.index.round(freq=freq)
+    # model_rounded_time = model_ps.index.round(freq=freq)
+    print('Skipping Collocation')
 
     # also drop zeros
     if drop_zeros:
-        ind = np.logical_or(collocated_obs_var == 0, collocated_model_var == 0)
-        ind = np.logical_not(ind)
-        collocated_obs_var = collocated_obs_var[ind]
-        collocated_model_var = collocated_model_var[ind]
+        obs_ps = obs_ps.loc[(obs_ps!=0)]
+        model_ps = model_ps.loc[(model_ps != 0)]
 
-    return collocated_obs_var, obs_ind, collocated_model_var, model_ind
+    common_index = obs_ps.index.intersection(model_ps.index)
+    collocated_obs_ps = obs_ps[common_index]
+    collocated_model_ps = model_ps[common_index]
+
+    return collocated_obs_ps, collocated_model_ps
 
 
 def get_default_colors_list():

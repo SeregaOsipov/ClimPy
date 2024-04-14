@@ -133,10 +133,12 @@ def create_times_var(dates):
     return aux_times
 
 
-def get_cell_area(nc):
-    mapfactor_mx = nc.variables['MAPFAC_MX'][0]
-    mapfactor_my = nc.variables['MAPFAC_MY'][0]
-    dx = getattr(nc, 'DX')  # m
-    dy = getattr(nc, 'DY')
-    cell_area = np.ones(mapfactor_mx.shape) * dx / mapfactor_mx * dy / mapfactor_my
+def get_cell_area(ds):
+    # defmapfactor_mx = ds.variables['MAPFAC_MX'][0]
+    # mapfactor_my = ds.variables['MAPFAC_MY'][0]
+    # dx = getattr(ds, 'DX')  # m
+    # dy = getattr(ds, 'DY')
+    # cell_area = np.ones(mapfactor_mx.shape) * dx / mapfactor_mx * dy / mapfactor_my
+
+    cell_area = ds.DX / ds.MAPFAC_MX * ds.DY /ds.MAPFAC_MY
     return cell_area
