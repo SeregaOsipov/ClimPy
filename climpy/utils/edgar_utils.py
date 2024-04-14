@@ -185,5 +185,7 @@ def prep_edgar_v61_totals(pollutants, file_path_template):
         if edgar_ds[cv].dtype == dtype('O'):
             edgar_ds[cv] = edgar_ds[cv].astype(str)
 
+    # edgar_ds = edgar_ds.rename_dims({'Country_code_A3': 'country'})
+
     return edgar_ds
 
