@@ -5,7 +5,7 @@ import time
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 
-def get_mie_efficiencies(ri, r_data, wavelength, phase_function_angles_in_radians=None):
+def get_mie_efficiencies_numpy(ri, r_data, wavelength, phase_function_angles_in_radians=None):
     """
     ri = ri_vo['ri'][ind]
     r_data = dA_vo['radii']
@@ -43,9 +43,15 @@ def get_mie_efficiencies(ri, r_data, wavelength, phase_function_angles_in_radian
             phase_function[wl_index, r_index, :] = mp.i_unpolarized(m.item(), x.item(), np.cos(phase_function_angles_in_radians))  # this is the phase function normalized to ssa
         # t_e = time.time()
         # print(t_e-t_s)
-    # dummy checks
+
     if np.any(qext < 0):
         raise Exception('Mie solution can not have negative extinction values, check RI')
+
+    return qext, qsca, g, qasm, phase_function, phase_function_angles_in_radians  # , always specify angles to avoid issues with xarray aply_ufunc
+
+
+def get_mie_efficiencies(ri, r_data, wavelength, phase_function_angles_in_radians=None):
+    qext, qsca, g, qasm, phase_function, phase_function_angles_in_radians = get_mie_efficiencies_numpy(ri, r_data, wavelength, phase_function_angles_in_radians)
 
     mie_ds = xr.Dataset(
         data_vars=dict(
@@ -66,46 +72,50 @@ def get_mie_efficiencies(ri, r_data, wavelength, phase_function_angles_in_radian
     return mie_ds
 
 
-def integrate_mie_over_aerosol_size_distribution(mie_ds, sd_profile_ds):
+def integrate_in_log_r(ds):
+    # temp_ds = ds.copy(deep=True)
+    # temp_ds['radius'] = np.log(temp_ds.radius)
+    # result = temp_ds.integrate(coord='radius')
+
+    # alternative approach
+    ds = ds.assign_coords(log_radius=('radius', np.log(ds['radius'].data)))
+    result = ds.integrate(coord='log_radius')
+
+    return result
+
+
+def integrate_mie_over_aerosol_size_distribution(mie_ds, dN_ds, include_phase_function=True):
     '''
     Assumptions about units:
     The input (radius, wavelength) in microns
     Mie efficiencies are dimensionless and cross-sections are microns^2
 
-    dNdlnr is per profile z length. I.e., to get the column SD, it needs to be integrated in z.
-    dNdlnr units are: number / um^2 / m
+    dNdlnr has units of [number / um^2] (column) or [number / um^3] (profile)
 
     :param mie_ds:
-    :param sd_profile_ds:
+    :param dN_ds:
+    :param include_phase_function: has large memory footprint
     :return:
     '''
 
-
-    dNdlnr = sd_profile_ds.dNdlogD  # number / um^2 / m  # (z is in meter
+    dNdlnr = dN_ds.dNdlogd  # [number / um^2] (column) or [number / um^3] (profile)
     A = np.pi * mie_ds.radius ** 2  # um^2
-
-    def integrate_in_log_r(ds):
-        temp_ds = ds.copy(deep=True)
-        temp_ds['radius'] = np.log(temp_ds.radius)
-        result = temp_ds.integrate(coord='radius')
-        return result
 
     # Have to integrate in log(r), not just r
     ext_coefficient = integrate_in_log_r(dNdlnr * A * mie_ds.qext)
     sca_coefficient = integrate_in_log_r(dNdlnr * A * mie_ds.qsca)
     asy_coefficient = integrate_in_log_r(dNdlnr * A * mie_ds.g * mie_ds.qsca)  # qasm = asymmetryParameter. * A. * qsca;
-    phase_function = integrate_in_log_r(dNdlnr * A * mie_ds.phase_function * mie_ds.qsca) / sca_coefficient
-
-    # Have to integrate in log(r), not just r
-    # ext_coefficient = np.trapz(dNdlnr * A * mie_ds.qext, np.log(mie_ds.radius), axis=0)
-    # sca_coefficient = np.trapz(dNdlnr * A * mie_ds.qsca, np.log(mie_ds.radius), axis=0)
-    # asy_coefficient = np.trapz(dNdlnr * A * mie_ds.g * mie_ds.qsca, np.log(mie_ds.radius), axis=0)
-    # phase_function = np.trapz(dNdlnr * A * mie_ds.phase_function * mie_ds.qsca, np.log(mie_ds.radius), axis=0) / sca_coefficient
+    if include_phase_function:
+        phase_function = integrate_in_log_r(dNdlnr * A * mie_ds.phase_function * mie_ds.qsca) / sca_coefficient
 
     ssa = sca_coefficient / ext_coefficient
     g = asy_coefficient / sca_coefficient
 
-    op_ds = xr.merge([ext_coefficient.rename('ext'), ssa.rename('ssa'), g.rename('g'), phase_function.rename('phase_function')])
+    das = [ext_coefficient.rename('ext'), ssa.rename('ssa'), g.rename('g')]
+    if include_phase_function:
+        das.append(phase_function.rename('phase_function'))
+
+    op_ds = xr.merge(das)
 
     return op_ds
 

@@ -14,8 +14,8 @@ Script derives several common diagnostics from WRF output, such as SO2 & O3 colu
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", "--port", "--host", help="pycharm")
-parser.add_argument("--wrf_in", help="wrf input file path" , default='/Users/osipovs/Data/AirQuality/AREAD/chem_100_v1/output/wrfout_d01_2022-11-01_00_00_00')
-parser.add_argument("--wrf_out", help="wrf output file path" , default='/Users/osipovs/Data/AirQuality/AREAD/chem_100_v1/output/pp_wrf/wrfout_d01_2022-11-01_00_00_00')
+parser.add_argument("--wrf_in", help="wrf input file path")#, default='/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/wrfout_d01_2017-12-14_00_00_00')
+parser.add_argument("--wrf_out", help="wrf output file path")# , default='/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/pp_wrf/wrfout_d01_2017-12-14_00_00_00')
 args = parser.parse_args()
 
 wrf_in_file_path = args.wrf_in

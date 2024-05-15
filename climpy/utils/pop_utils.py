@@ -10,6 +10,7 @@ middle_eastern_countries = 'Algeria, Bahrain, Egypt, Iran, Iraq, Israel, Jordan,
 middle_eastern_countries_in_AQABA_WRF_domain = 'Bahrain, Cyprus, Egypt, Iran, Iraq, Israel, Jordan, Kuwait, Lebanon, Oman, Qatar, Saudi Arabia, Syria, Turkey, United Arab Emirates, Yemen'.split(', ')   #inside WRF domain
 middle_eastern_countries_in_AQABA_WRF_domain_for_table = 'Bahrain, Cyprus, Egypt, Iran, Iraq, Israel, Jordan, Kuwait, Lebanon, Oman, Qatar, Saudi Arabia, Syria, Turkey, UAE, Yemen'.split(', ')
 
+
 def get_present_population():
     # TODO: population does not add up correctly. It is OK as relative weights, but I have to fix the regriding
     ds = xr.open_dataset(get_root_storage_path_on_hpc()+'/Data/AirQuality/EMME/population/GHS_POP_E2020_GLOBE_R2023A_4326_30ss_V1_0_on_wrf_grid.nc').rename({'Band1':'PopulationCount'})
@@ -17,8 +18,8 @@ def get_present_population():
     return ds
 
 
-def compute_pop_weighted_diags_by_country(input_ds, population_as_weight_ds=None):
-    input_ds = input_ds.rename({'XLONG': 'lon', 'XLAT': 'lat'})
+def compute_pop_weighted_diags_by_country(xr_in, population_ds=None):
+    xr_in = xr_in.rename({'XLONG': 'lon', 'XLAT': 'lat'})
 
     # middle_eastern_countries_in_AQABA_WRF_domain.sort()  # sorting happens in place
 
@@ -27,7 +28,7 @@ def compute_pop_weighted_diags_by_country(input_ds, population_as_weight_ds=None
     # middle_eastern_countries_in_AQABA_WRF_domain = middle_eastern_countries_in_AQABA_WRF_domain[0:3]  # debug
 
     regionmask_countries = regionmask.defined_regions.natural_earth_v5_0_0.countries_50
-    mask = regionmask_countries.mask(input_ds)  # mask all countries even partial overlap
+    mask = regionmask_countries.mask(xr_in.isel(Time=0))  # mask all countries even partial overlap
 
     def weight_and_average_ds(in_country_ds, population_as_weight_ds=None):
         if population_as_weight_ds is None:
@@ -41,8 +42,8 @@ def compute_pop_weighted_diags_by_country(input_ds, population_as_weight_ds=None
 
     # add Middle East in general accounting for all countries in the list first
     country_indices_in_me = regionmask_countries.map_keys(middle_eastern_countries_in_AQABA_WRF_domain)
-    in_me_ds = input_ds.where(np.in1d(mask, country_indices_in_me).reshape(mask.shape))
-    weighted_ds = weight_and_average_ds(in_me_ds, population_as_weight_ds)
+    in_me_ds = xr_in.where(np.in1d(mask, country_indices_in_me).reshape(mask.shape))
+    weighted_ds = weight_and_average_ds(in_me_ds, population_ds)
     dss_by_country += [weighted_ds, ]
 
     # process countries individually
@@ -50,8 +51,8 @@ def compute_pop_weighted_diags_by_country(input_ds, population_as_weight_ds=None
         country_index = regionmask_countries.map_keys(country)
         print('{}:{}'.format(country, country_index))
 
-        in_country_ds = input_ds.where(mask == country_index)
-        weighted_ds = weight_and_average_ds(in_country_ds, population_as_weight_ds)
+        in_country_ds = xr_in.where(mask == country_index)
+        weighted_ds = weight_and_average_ds(in_country_ds, population_ds)
         dss_by_country += [weighted_ds, ]
 
     pop_weighted_diags_by_country_ds = xr.concat(dss_by_country, dim='country')

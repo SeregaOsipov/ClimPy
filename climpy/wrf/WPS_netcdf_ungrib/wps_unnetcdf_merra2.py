@@ -26,19 +26,22 @@ These are some of the MERRA2 docs for quick reference
 2. https://gmao.gsfc.nasa.gov/pubs/docs/Reichle541.pdf
 
 Run command example:
-python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_merra2.py --start_date=2022-10-25 --end_date=2023-01-01 >& log.unnetcdf_aread
+python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_merra2.py --start_date=2017-01-01 --end_date=2017-06-15 >& log.unnetcdf_2017_jan-jun
 
 TODO: replace MERRA2 predownloading with the OpenDAP access
 
 To process by month in parallel, use wps_unnetcdf_merra2_monthly.sh
 '''
 
-
-
+parser = argparse.ArgumentParser()
+parser.add_argument("--start_date", help="unnetcdf is similar to the WPS ungrib, provide the start and end dates in the YYYY-MM-DD format")
+parser.add_argument("--end_date", help="unnetcdf is similar to the WPS ungrib, provide the end date in the YYYY-MM-DD format")
+parser.add_argument("--mode", "--port", help="the are only to support pycharm debugging")
+args = parser.parse_args()
 
 out_storage_path = '/home/osipovs/workspace/WRF/Data/unnetcdf/'
 out_storage_path = '/project/k1090/osipovs/Data/NASA/MERRA2/unnetcdf/'
-out_storage_path = '/work/mm0062/b302074/Data/NASA/MERRA2/unnnetcdf/'
+out_storage_path = '/work/mm0062/b302074/Data/NASA/MERRA2/unnetcdf/'
 # out_storage_path = '/Users/osipovs2/Temp/'  # local debug
 try:
     os.makedirs(out_storage_path)

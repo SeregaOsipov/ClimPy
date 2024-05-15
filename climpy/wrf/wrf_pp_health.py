@@ -30,16 +30,15 @@ levante:
 wrf_output_folder=/work/mm0062/b302074/Data/AirQuality/$campaign/$sim_version/output/
 
 python -u ${CLIMPY}/climpy/wrf/wrf_pp_health.py --wrf_in=$wrf_output_folder/ship_track/wrf_ship_track.nc --wrf_out=$wrf_output_folder/ship_track/pp/wrf_ship_track.nc
-
 '''
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", help="pycharm")
 parser.add_argument("--port", help="pycharm")
 parser.add_argument("--host", help="pycharm")
-parser.add_argument("--wrf_in", help="wrf input file path", default='/work/mm0062/b302074/Data/AirQuality/EMME/2050/CLE/chem_100_v1/output/wrfout_d01_2050-12-02_00_00_00')  # default='/work/mm0062/b302074/Data/AirQuality/EMME/chem_100_v100/output/pp_wrf_health/boa/wrfout_d01_2017-06-15_00:00:00')
-parser.add_argument("--wrf_out", help="wrf output file path", default='/work/mm0062/b302074/Data/AirQuality/AREAD/chem_100_v1/output/pp_health/wrfout_d01_2022-11-01_00_00_00')
-parser.add_argument("--pm_input_is_aerodynamic_diameter", help="True/False", type=strtobool, default=True)  # default='/work/mm0062/b302074/Data/AirQuality/AQABA/chem_100_v15/output/pp_wrf_health/pm/wrfout_d01_2017-08-31_00:00:00'
+parser.add_argument("--wrf_in", help="wrf input file path", default='/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/wrfout_d01_2017-11-16_00_00_00')#'/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/cdo/wrfout_d01_timmean')
+parser.add_argument("--wrf_out", help="wrf output file path", default='/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/pp_health/wrfout_d01_2017-11-16_00_00_00')#'/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/cdo/pp_health/wrfout_d01_timmean')
+parser.add_argument("--pm_input_is_aerodynamic_diameter", help="True/False", type=strtobool, default=True)
 args = parser.parse_args()
 
 print('Will process this WRF:\nin {}\nout {}'.format(args.wrf_in, args.wrf_out))
@@ -51,7 +50,15 @@ chem_opt = 100
 aerosols_keys = get_aerosols_keys(chem_opt)
 #%%
 xr_in = xr.open_dataset(args.wrf_in)
-xr_in_boa = xr_in.sel(bottom_top=0) #.sel(Time=[0,1,2])  # DEBUG only
+xr_in_boa = xr_in.sel(bottom_top=0)
+
+preload_xarray_dataset = True
+if preload_xarray_dataset:  # preload xr_in to speed up the calculations
+    preloading_keys = aerosols_keys + tuple('nu0,ac0,corn,NU3,AC3,COR3,ALT'.split(','))
+    print('preloading following variables {}'.format(preloading_keys))
+    xr_in_boa = xr_in_boa[list(preloading_keys)]
+    xr_in_boa.load()
+    print('done loading xr_in')
 
 # compute PMs
 pm1_sizes = [1 * 10 ** -20, 1 * 10 ** -6]  # m, min max for integration
@@ -96,6 +103,7 @@ if 'PH_ERYTHEMA' in xr_in_boa.variables.keys():
 #%% Make ds CDO complaint
 # for var_key in wrf_ds.variables:
 #     wrf_ds[var_key].encoding['_FillValue'] = None  # make CDO compliant
+wrf_ds = wrf_ds.drop('mode')  # singular coordinate cause ncview issues
 #%% export section
 if not os.path.exists(os.path.dirname(args.wrf_out)):
     os.makedirs(os.path.dirname(args.wrf_out))

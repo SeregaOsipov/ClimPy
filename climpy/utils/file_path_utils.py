@@ -5,27 +5,46 @@ from natsort import natsorted
 STORAGE_PATH_SHAHEEN = '/project/k1090/osipovs/'
 STORAGE_PATH_LEVANTE = '/work/mm0062/b302074/'
 
-root_storage_path = None
+root_path = None
+root_data_path = None
 
 
 def set_env(env):
-    global root_storage_path
+    global root_path
+    global root_data_path
     if env == 'local':
-        root_storage_path = os.path.expanduser('~')
+        root_path = os.path.expanduser('~')
+    if env == 'workstation':  # KAUST workstation in the office
+        root_path = '/home/osipovs/'
+        root_data_path = '/HDD2/'
+
+
+def get_root_path_on_hpc():
+    global root_path
+
+    if root_path is None:
+        root_path = os.path.expanduser('~')  # local first
+        if os.path.exists(STORAGE_PATH_SHAHEEN):
+            root_path = STORAGE_PATH_SHAHEEN
+        elif os.path.exists(STORAGE_PATH_LEVANTE + 'Data/'):
+            root_path = STORAGE_PATH_LEVANTE
+    return root_path
 
 
 def get_root_storage_path_on_hpc():
-    if root_storage_path is None:
-        path = os.path.expanduser('~')  # local first
+    global root_data_path
+
+    if root_data_path is None:
+        root_data_path = os.path.expanduser('~')  # local first
         if os.path.exists(STORAGE_PATH_SHAHEEN):
-            path = STORAGE_PATH_SHAHEEN
+            root_data_path = STORAGE_PATH_SHAHEEN
         elif os.path.exists(STORAGE_PATH_LEVANTE + 'Data/'):
-            path = STORAGE_PATH_LEVANTE
-    return root_storage_path
+            root_data_path = STORAGE_PATH_LEVANTE
+    return root_data_path
 
 
 def get_pictures_root_folder():
-    return get_root_storage_path_on_hpc() + '/Pictures/'
+    return get_root_path_on_hpc() + '/Pictures/'
 
 
 def get_aeronet_file_path_root():

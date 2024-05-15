@@ -209,8 +209,7 @@ def get_wrf_sd_params(xr_in):
     sd_ds = xr.merge([sgs, dgs, m0s, m3s])
     sd_ds['mode'] = ['i', 'j', 'k']
 
-    # return sgs, dgs, m0s, m3s
-    return sd_ds
+    return sd_ds  # sgs, dgs, m0s, m3s
 
 
 def derive_m3s_from_mass_concentrations(xr_in, chem_opt, wet=False, sum_up_components=True):
@@ -240,7 +239,7 @@ def derive_m3s_from_mass_concentrations(xr_in, chem_opt, wet=False, sum_up_compo
     return m3_pp
 
 
-def sample_WRF_MADE_size_distributions(sd_ds): # dp, sgs, dgs, m0s, m3s):
+def sample_WRF_MADE_size_distributions(sd_ds):
     """
     All parameters are by mode (list for each mode)
     :param dp:
@@ -252,14 +251,10 @@ def sample_WRF_MADE_size_distributions(sd_ds): # dp, sgs, dgs, m0s, m3s):
     """
 
     sd_ds['dNdlogd'] = 1 / ((2 * np.pi) ** (1 / 2) * np.log(sd_ds['sgs'])) * np.exp(-1 / 2 * (np.log(sd_ds['radius']*2) - np.log(sd_ds['dgs'])) ** 2 / np.log(sd_ds['sgs']) ** 2)
-
+    sd_ds['dNdlogd'] *= sd_ds.m0s  # this is the n(logdp) from ACKERMANN et al., equation 1
     # dNdlogds = ()  # list of dNdlogd by mode
     # for sg, dg, m0, m3 in zip(sgs, dgs, m0s, m3s):
     #     if isinstance(sg, float):  # # if sg/dg... are numbers, then convert them to arrays
-    #         sg = np.array(sg)
-    #         dg = np.array(dg)
-    #         m0 = np.array(m0)
-    #         m3 = np.array(m3)
     #
     #     # THIS one is faster then sp.stats.lognorm
     #     dNdlogd = 1/((2*np.pi)**(1/2) * np.log(sg[..., np.newaxis])) * np.exp(-1/2 * (np.log(dp)-np.log(dg[..., np.newaxis]))**2 / np.log(sg[..., np.newaxis])**2)
@@ -284,7 +279,7 @@ def compute_MADE_bounded_distribution_factors(d_min, d_max, sgs, dgs, m3s, m0s):
     2nd factor to multiply total number of particles and to get N[d>=d_min, d<=d_max] i.e. N[d>min, d<max] = N_0 * factor
     """
 
-    # this factors are the ratio that they contribute to the total number N_0 or volume V_0
+    # these factors are the ratio that they contribute to the total number N_0 or volume V_0
     N_factors = []
     V_factors = []
     for sg, dg, m3, m0 in zip(sgs, dgs, m3s, m0s):
@@ -292,11 +287,9 @@ def compute_MADE_bounded_distribution_factors(d_min, d_max, sgs, dgs, m3s, m0s):
 
         # See for details https://patarnott.com/pdf/SizeDistributions.pdf, eqn 24-27
         # N[Dmin, Dmax] = N_0/2 * []
-        N_factor = 1 / 2 * (sp.special.erf(np.log(d_max / dg) / (2 ** 0.5 * np.log(sg))) - sp.special.erf(
-            np.log(d_min / dg) / (2 ** 0.5 * np.log(sg))))
+        N_factor = 1 / 2 * (sp.special.erf(np.log(d_max / dg) / (2 ** 0.5 * np.log(sg))) - sp.special.erf(np.log(d_min / dg) / (2 ** 0.5 * np.log(sg))))
         # V[Dmin, Dmax] = V_0/2 * []   ! There is typo in equation 27, it should be V_0, not N_0
-        V_factor = 1 / 2 * (sp.special.erf(np.log(d_max / d_v_median) / (2 ** 0.5 * np.log(sg))) - sp.special.erf(
-            np.log(d_min / d_v_median) / (2 ** 0.5 * np.log(sg))))
+        V_factor = 1 / 2 * (sp.special.erf(np.log(d_max / d_v_median) / (2 ** 0.5 * np.log(sg))) - sp.special.erf(np.log(d_min / d_v_median) / (2 ** 0.5 * np.log(sg))))
 
         # V_0 = N_0  * pi/6 * dg^3 * exp(9/2 ln(sg)^2)
         # NtoV_factor = (np.pi / 6 * dg ** 3 * np.exp(9 / 2 * np.log(sg) ** 2)) ** -1
@@ -387,6 +380,7 @@ def get_aerosols_pm_stack(xr_in, aerosols_keys, pm_size_range=None, pm_input_is_
     for key in aerosols_keys:
         # all vars are [ug/kg-dryair], alt is [m3 kg-1]
         # print('{} [{}]'.format(key, nc.variables[key].units))
+        print('get_aerosols_pm_stack: {}'.format(key))
         diag = xr_in[key][:] / alt
 
         # by default assign V factors to 1 for all types, it is equal to PM from 0 to Infinity
@@ -457,8 +451,8 @@ def get_wrf_size_distribution_by_modes(xr_in, sum_up_modes=False, column=False, 
     '''
     :param xr_in:
     :param r_grid_to_merge: additional sampling points, [m]
-    :return: original dNdlogr has units [part / m^3], this can be modified by
-    decorator derive_size_distribution_moment
+    :return: original dNdlogr has units [part / m^3], this can be modified by decorator derive_size_distribution_moment
+             column=True changes units to [part / m^2]
     '''
 
     sd_ds = get_wrf_sd_params(xr_in)  # size distribution parameters: sgs, dgs, m0s, m3s
@@ -478,7 +472,7 @@ def get_wrf_size_distribution_by_modes(xr_in, sum_up_modes=False, column=False, 
     sd_ds['radius'] = dp / 2
     sd_ds.radius.attrs['units'] = 'm'
 
-    sd_ds = sample_WRF_MADE_size_distributions(sd_ds) #dp, sgs, dgs, m0s, m3s)
+    sd_ds = sample_WRF_MADE_size_distributions(sd_ds)  # dp, sgs, dgs, m0s, m3s
     sd_ds['radius'] = sd_ds['radius'] * 10**6  # um
     sd_ds.radius.attrs['units'] = 'um'
 
@@ -486,15 +480,18 @@ def get_wrf_size_distribution_by_modes(xr_in, sum_up_modes=False, column=False, 
     if sum_up_modes:
         sd_ds['dNdlogd'] = sd_ds['dNdlogd'].sum(dim='mode')
 
+    units_scale = 10 ** -18
+    units = 'particles / um**3'
     if column:  # integrate vertically
         z_stag = (xr_in['PH'] + xr_in['PHB']) / 9.8
         dz = z_stag.diff(dim='bottom_top_stag').rename({'bottom_top_stag': 'bottom_top'})
         sd_ds['dNdlogd'] = (sd_ds['dNdlogd'] * dz).sum(dim='bottom_top')
-        # TODO: do not change units here
-        sd_ds['dNdlogd'] *= 10 ** -12  # particles * um**3 / um**2  # convert units: WRF [part * um^3 / m^3 * m] to Aeronet [um^3/um^2]
 
-        # z_dim = vo['data'].shape.index(xr_in.dimensions['bottom_top'].size)  # deduce z_dim index
-        # vo['data'] = np.sum(vo['data'] * dz[..., np.newaxis], axis=z_dim)
-        # vo['data'] *= 10 ** -12  # particles * um**3 / um**2  # convert units: WRF [part * um^3 / m^3 * m] to Aeronet [um^3/um^2]
+        units_scale = 10 ** -12
+        units = 'particles * / um**2'
+        # sd_ds['dNdlogd'] *= 10 ** -12  # particles * um**3 / um**2  # convert units: WRF [part * um^3 / m^3 * m] to Aeronet [um^3/um^2]
+
+    sd_ds['dNdlogd'] *= units_scale  # units should be in microns, not in meters
+    sd_ds.dNdlogd.attrs['units'] = units
 
     return sd_ds
