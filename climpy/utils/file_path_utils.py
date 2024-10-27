@@ -2,7 +2,7 @@ import glob
 import os
 from natsort import natsorted
 
-STORAGE_PATH_SHAHEEN = '/project/k1090/osipovs/'
+STORAGE_PATH_SHAHEEN = '/project/k10048/osipovs/'
 STORAGE_PATH_LEVANTE = '/work/mm0062/b302074/'
 
 root_path = None
@@ -17,6 +17,9 @@ def set_env(env):
     if env == 'workstation':  # KAUST workstation in the office
         root_path = '/home/osipovs/'
         root_data_path = '/HDD2/'
+    if env == 'MacBook':  # KAUST workstation in the office
+        root_path = '/Users/osipovs/'
+        root_data_path = '/Users/osipovs/'
 
 
 def get_root_path_on_hpc():

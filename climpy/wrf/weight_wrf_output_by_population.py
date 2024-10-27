@@ -15,14 +15,17 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 Run examples:
 python -u ${CLIMPY}climpy/wrf/weight_wrf_output_by_population.py --wrf_in=/work/mm0062/b302074/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_health/wrfout_d01_timmean --wrf_out=/work/mm0062/b302074/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_health/wrfout_d01_timmean_pop_wtd --excel_out=/work/mm0062/b302074/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_health/wrfout_d01_timmean_pop_wtd.xls
 
+rootPath=/work/mm0062/b302074/  # LEVANTE
+rootPath=/scratch/osipovs/  # Shaheen
+
 # health
 for scenario in 2017 2050/HLT 2050/CLE 2050/MFR 2050/MFR_LV
 do
     echo $scenario
     # hourly
-    python -u ${CLIMPY}climpy/wrf/weight_wrf_output_by_population.py --wrf_in=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_health/wrfout_d01_*_00 --wrf_out=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_health/wrfout_d01_hourly_pop_wtd &
+    python -u ${CLIMPY}climpy/wrf/weight_wrf_output_by_population.py --wrf_in=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_health/wrfout_d01_*_00 --wrf_out=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_health/wrfout_d01_hourly_pop_wtd &
     # timmean
-    # python -u ${CLIMPY}climpy/wrf/weight_wrf_output_by_population.py --wrf_in=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_health/wrfout_d01_timmean --wrf_out=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_health/wrfout_d01_timmean_pop_wtd --excel_out=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_health/wrfout_d01_timmean_pop_wtd.xls
+    # python -u ${CLIMPY}climpy/wrf/weight_wrf_output_by_population.py --wrf_in=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_health/wrfout_d01_timmean --wrf_out=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_health/wrfout_d01_timmean_pop_wtd --excel_out=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_health/wrfout_d01_timmean_pop_wtd.xls
 done
 wait
 
@@ -31,13 +34,32 @@ for scenario in 2017 2050/HLT 2050/CLE 2050/MFR 2050/MFR_LV
 do
     echo $scenario
     # hourly
-    python -u ${CLIMPY}climpy/wrf/weight_wrf_output_by_population.py --var_keys=twb --wrf_in=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_wrf/wrfout_d01_*_00 --wrf_out=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_wrf/wrfout_d01_hourly_pop_wtd &
+    python -u ${CLIMPY}climpy/wrf/weight_wrf_output_by_population.py --var_keys=twb --wrf_in=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_wrf/wrfout_d01_*_00 --wrf_out=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_wrf/wrfout_d01_hourly_pop_wtd &
     # timmean
-    # python -u ${CLIMPY}climpy/wrf/weight_wrf_output_by_population.py --var_keys=twb --wrf_in=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_wrf/wrfout_d01_timmean --wrf_out=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_wrf/wrfout_d01_timmean_pop_wtd --excel_out=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_wrf/wrfout_d01_timmean_pop_wtd.xls
-    # python -u ${CLIMPY}climpy/wrf/weight_wrf_output_by_population.py --var_keys=T2,Q2 --wrf_in=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/cdo/wrfout_d01_timmean --wrf_out=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/cdo/wrfout_d01_timmean_pop_wtd --excel_out=/work/mm0062/b302074/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/cdo/wrfout_d01_timmean_pop_wtd.xls
+    # python -u ${CLIMPY}climpy/wrf/weight_wrf_output_by_population.py --var_keys=twb --wrf_in=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_wrf/wrfout_d01_timmean --wrf_out=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_wrf/wrfout_d01_timmean_pop_wtd --excel_out=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/pp_wrf/wrfout_d01_timmean_pop_wtd.xls
+    # python -u ${CLIMPY}climpy/wrf/weight_wrf_output_by_population.py --var_keys=T2,Q2 --wrf_in=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/cdo/wrfout_d01_timmean --wrf_out=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/cdo/wrfout_d01_timmean_pop_wtd --excel_out=${rootPath}/Data/AirQuality/EMME/${scenario}/chem_100_v1/output/cdo/wrfout_d01_timmean_pop_wtd.xls
+done
+wait
+
+
+# COAWST, twb (pp_wrf)
+rootPath=/scratch/osipovs/  # Shaheen
+for scenario in CLE HLT MFR MFR_LV present_day/aer_on present_day/aer_off
+do
+    echo $scenario
+    simPath=${rootPath}/Data/COAWST/EMME/2017/${scenario}/
+    
+    # hourly
+    #python -u ${CLIMPY}/climpy/wrf/weight_wrf_output_by_population.py --var_keys=twb --wrf_in=${simPath}/chem_100_v1/output/pp_wrf/wrfout_d01_*_00 --wrf_out=${simPath}/chem_100_v1/output/pp_wrf/wrfout_d01_hourly_pop_wtd &
+    python -u ${CLIMPY}/climpy/wrf/weight_wrf_output_by_population.py --var_keys=T2,Q2 --wrf_in=${simPath}/chem_100_v1/output/wrfout_d01_*_00 --wrf_out=${simPath}/chem_100_v1/output/pop_wtd/wrfout_d01_hourly_pop_wtd &
+    
+    # timmean
+    # python -u ${CLIMPY}/climpy/wrf/weight_wrf_output_by_population.py --var_keys=twb --wrf_in=${simPath}/chem_100_v1/output/pp_wrf/wrfout_d01_timmean --wrf_out=${simPath}/chem_100_v1/output/pp_wrf/wrfout_d01_timmean_pop_wtd --excel_out=${simPath}/chem_100_v1/output/pp_wrf/wrfout_d01_timmean_pop_wtd.xls
+    # python -u ${CLIMPY}/climpy/wrf/weight_wrf_output_by_population.py --var_keys=T2,Q2 --wrf_in=${simPath}/chem_100_v1/output/cdo/wrfout_d01_timmean --wrf_out=${simPath}/chem_100_v1/output/cdo/wrfout_d01_timmean_pop_wtd --excel_out=${simPath}/chem_100_v1/output/cdo/wrfout_d01_timmean_pop_wtd.xls
 done
 wait
 '''
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", "--port", "--host", help="pycharm")
@@ -60,6 +82,10 @@ args = parser.parse_args()
 # args.var_keys='T2,Q2,o3,no,no2'
 # args.select_boa=True
 
+# args.wrf_in='/scratch/osipovs/Data/COAWST/EMME/2017/HLT/chem_100_v1/output/pp_wrf/wrfout_d01_2017-01-13_00_00_00'
+# args.wrf_out='/scratch/osipovs/Data/COAWST/EMME/2017/HLT/chem_100_v1/output/pp_wrf/wrfout_d01_2017-01-13_00_00_00_pop_wtd'
+# args.var_keys='twb'  # T2,Q2,o3,no,no2'
+
 print('Will process WRF files:\nin {}\nout {}'.format(args.wrf_in, args.wrf_out))
 print('Will keep this WRF vars:\n{}'.format(args.var_keys))
 #%% Parallel attempt
@@ -77,7 +103,11 @@ xr_in = xr.open_mfdataset(args.wrf_in, combine='nested', concat_dim='Time')
 # xr_in = xr.open_dataset(args.wrf_in)
 
 xr_in = xr_in.drop_vars('XTIME_bnds', errors='ignore')
-xr_in = xr_in.rename({'XTIME':'Time'})
+if 'Time' in xr_in.coords:
+    xr_in = xr_in.drop_vars('XTIME')  # if netcdf was processed by xarray, then I may already have a Time variable
+else:
+    xr_in = xr_in.rename({'XTIME':'Time'})
+
 if args.var_keys is not None:
     print('Selecting the following vars {}'.format(args.var_keys))
     xr_in = xr_in[args.var_keys.split(',')]
