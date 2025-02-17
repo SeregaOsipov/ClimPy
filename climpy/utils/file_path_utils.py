@@ -17,10 +17,12 @@ def set_env(env):
     if env == 'workstation':  # KAUST workstation in the office
         root_path = '/home/osipovs/'
         root_data_path = '/HDD2/'
-    if env == 'MacBook':  # KAUST workstation in the office
+    if env == 'MacBook':
         root_path = '/Users/osipovs/'
         root_data_path = '/Users/osipovs/'
-
+    if env == 'Levante':
+        root_path = STORAGE_PATH_LEVANTE
+        root_data_path = STORAGE_PATH_LEVANTE
 
 def get_root_path_on_hpc():
     global root_path
