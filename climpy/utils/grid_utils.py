@@ -1,4 +1,4 @@
-import ESMF
+# import ESMF
 import xarray as xe
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'

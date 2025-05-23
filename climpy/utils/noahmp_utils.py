@@ -3,7 +3,7 @@ import pandas as pd
 import xarray as xr
 import numpy as np
 
-def get_noahmp_table_as_df(noahmp_table_fp = '/project/k1090/osipovs/Models/hrldas/noahmp/parameters/NoahmpTable.TBL'):
+def get_noahmp_table_as_df(noahmp_table_fp = '/project/k10048/osipovs/Models/hrldas/noahmp/parameters/NoahmpTable.TBL'):
     '''
 
     Prepare the NoahMP parameters from the table

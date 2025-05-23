@@ -47,24 +47,33 @@ def correct_ri_sign_convention(func):
     return wrapper_decorator
 
 
-@interpolate_ri_in_wavelength
+#@interpolate_ri_in_wavelength
 def get_Williams_Palmer_refractive_index():
     '''
     :return: Refractive index from Palmer and Williams(1975) of 75 % sulfate aerosol
     wavelength is in microns
+
+    url: https://hitran.org/data/Aerosols/Aerosols-2020/
     '''
 
-    nc_fp = get_root_storage_path_on_hpc() + '/Data/Harvard/HITRAN/HITRAN2012/Aerosols/netcdf/palmer_williams_h2so4.nc'
+    # nc_fp = get_root_storage_path_on_hpc() + '/Data/Harvard/HITRAN/HITRAN2012/Aerosols/netcdf/palmer_williams_h2so4.nc'
+    nc_fp = get_root_storage_path_on_hpc() + '/Data/HITRAN/Aerosols/Aerosols-2020/hitran_ri/netcdf/palmer_williams_h2so4.nc'
     nc = netCDF4.Dataset(nc_fp)
-    wl = nc.variables['wavelength'][:]
+
     ri_real = nc.variables['rn'][3, :]  # index 4 is 75% solution
     ri_imag = nc.variables['ri'][3, :]
 
-    ri_vo = {}
-    ri_vo['ri'] = ri_real + 1j * ri_imag
-    ri_vo['ri'] = ri_vo['ri'][::-1]
-    ri_vo['wl'] = wl[::-1]
-    return ri_vo
+    ds = xr.Dataset(
+        data_vars=dict(
+            ri=(["wavelength", ], ri_real + 1j * ri_imag),
+        ),
+        coords=dict(
+            wavelength=("wavelength", nc.variables['wavelength'][:]),
+        ),
+        attrs=dict(description="Palmer and Williams 75% H2SO4 complex refractive index."),
+    )
+    ds = ds.sortby('wavelength')
+    return ds
 
 
 @correct_ri_sign_convention

@@ -23,6 +23,10 @@ def set_env(env):
     if env == 'Levante':
         root_path = STORAGE_PATH_LEVANTE
         root_data_path = STORAGE_PATH_LEVANTE
+    if env == 'Shaheen':
+        root_path = STORAGE_PATH_SHAHEEN
+        root_data_path = STORAGE_PATH_SHAHEEN
+
 
 def get_root_path_on_hpc():
     global root_path

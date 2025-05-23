@@ -63,8 +63,10 @@ args = parser.parse_args()
 # args.sum_up_modes = False
 #local
 # annual
-# args.wrf_in='/home/osipovs/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean'
-# args.wrf_out = '/home/osipovs/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean_optics'
+
+args.wrf_in='/HDD2/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/cdo//wrfout_d01_timmean'
+args.wrf_out = '/HDD2/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/wrfout_d01_timmean_optics_by_mode'
+args.sum_up_modes=False
 # monmean
 # args.wrf_in='/HDD2/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_monmean'
 # args.wrf_out = '/HDD2/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_monmean_optics'
@@ -112,7 +114,7 @@ if __name__ == '__main__':
     print('Starting Dask Client')
     from dask.distributed import Client
 
-    # client = Client(n_workers=10, threads_per_worker=1, memory_limit='10GB')  # memory_limit is per worker
+    # client = Client(n_workers=10, threads_per_worker=1, memory_limit='10GB')  # Local. memory_limit is per worker
     client = Client(n_workers=50, threads_per_worker=1, memory_limit='5GB')  # levante
     print('Client is ready {}'.format(client))  # http://127.0.0.1:8787/status
     #%%
@@ -139,3 +141,24 @@ if __name__ == '__main__':
 # ri_ds = ri_ds.isel(south_north=slice(0,dsize), west_east=slice(0,dsize))
 # dA_ds = dA_ds.isel(south_north=slice(0,dsize), west_east=slice(0,dsize))
 # dN_ds = dN_ds.isel(south_north=slice(0,dsize), west_east=slice(0,dsize))
+#%% debugging plots
+# import matplotlib.pyplot as plt
+# plt.ion()
+# plt.figure()
+# np.abs(ri_ds.isel(wavelength=0).ri.imag).plot(cmap='Oranges', vmax=0.05)
+#
+# op_ds.ssa
+#
+# mie_ds
+# dN_ds
+#
+# mie_ds.qsca.isel(time=0, south_north=250, west_east=250, wavelength=1).plot()
+# mie_ds.qext.isel(time=0, south_north=250, west_east=250, wavelength=1).plot()
+#
+# ssa = mie_ds.qsca / mie_ds.qext
+#
+# plt.figure()
+# plt.clf()
+# ssa.isel(time=0, south_north=250, west_east=250, wavelength=1).plot()
+# plt.yscale('log')
+# plt.xscale('log')

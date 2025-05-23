@@ -3,10 +3,24 @@ import numpy as np
 import climpy.utils.netcdf_utils as nc_utils
 # from libs.readers import AbstractNetCdfReader as ancr
 import matplotlib.pyplot as plt
+import xarray as xr
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
 Z_DIM_NC_KEY = 'bottom_top'
+
+
+def inject_geo_em_coordinates(ds, geo_em_fp):
+    # Supplements the missing the coordinates in emissions from geo_em file
+    geo_em_ds = xr.open_dataset(geo_em_fp)
+    geo_em_ds = geo_em_ds.isel(Time=0)
+
+    ds['XLONG'] = geo_em_ds.XLONG_M
+    ds['XLAT'] = geo_em_ds.XLAT_M
+    # ds = ds.set_coords(['XLAT', 'XLONG'])  # TODO: make use of it everywhere
+    # ds.xoak.set_index(['XLAT', 'XLONG'], 'sklearn_geo_balltree')
+
+    return ds
 
 
 def plot_domain(nc, subplot_config=111):

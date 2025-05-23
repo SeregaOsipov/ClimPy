@@ -15,15 +15,15 @@ def get_cams_emissions(drop_ocean=True):
 
     2015 CAMS should be simply ECLIPSE version 6.
     '''
-    # fp = get_root_storage_path_on_hpc() + '/Data/emissions/CAMS/cams_by_country.csv'  # originally produced by Klaus Klingmuller here /work/mm0062/b302045/emac-daten/cams/cams_by_country.csv
-    fp = os.path.expanduser('~') + '/Data/emissions/CAMS/cams_by_country.csv'  # originally produced by Klaus Klingmuller here /work/mm0062/b302045/emac-daten/cams/cams_by_country.csv
+    fp = get_root_storage_path_on_hpc() + '/Data/emissions/CAMS/cams_by_country.csv'  # originally produced by Klaus Klingmuller here /work/mm0062/b302045/emac-daten/cams/cams_by_country.csv
+    # fp = os.path.expanduser('~') + '/Data/emissions/CAMS/cams_by_country.csv'  # originally produced by Klaus Klingmuller here /work/mm0062/b302045/emac-daten/cams/cams_by_country.csv
     df = pd.read_csv(fp, header=0)
     df = df.convert_dtypes()
     df['emission'] = df.emission.astype(float)
-    # df.rename(columns={'iso3': 'iso', 'location_name':'name'}, inplace=True)
+    df.rename(columns={'location_name':'name'}, inplace=True)
     # df.drop('country.id', axis=1, inplace=True)
     df.rename(columns={'country.id': 'country_numeric'}, inplace=True)
-    df.drop(['iso3', 'location_name'], axis=1, inplace=True)
+    # df.drop(['iso3', 'location_name'], axis=1, inplace=True)
 
     df = df[df.component != 'co2_excl_short-cycle_org_C']  # the other one is CO2, I assume that it has everything
     df = df[df.sector != 'sum']  # Klaus includes 'sum' in the section column. This leads to double counting, drop it

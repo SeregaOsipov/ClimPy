@@ -73,7 +73,7 @@ def aggregate_by_regions(func):
 def prep_edgar_pollutant(pollutant, file_path_template):
     file_path = file_path_template.format(pollutant, pollutant, pollutant)
     edgar_df = pd.read_excel(file_path, sheet_name='TOTALS BY COUNTRY', header=9)
-    edgar_df.rename(columns={'ISO_A3': 'iso', 'Country_code_A3': 'iso', 'Name': 'name'}, inplace=True)  # both AP & GHG columns
+    edgar_df.rename(columns={'ISO_A3': 'iso3', 'Country_code_A3': 'iso3', 'Name': 'name'}, inplace=True)  # both AP & GHG columns
 
     mapping = {}
     for year in np.arange(1970, 2019):
@@ -120,7 +120,7 @@ def prep_edgar_totals_by_region(pollutants, file_path_template, wb_meta_df, popu
     for pollutant in pollutants:  # pollutant = 'SO2'
         regional_df = prep_edgar_pollutant(pollutant, file_path_template, wb_meta_df=wb_meta_df, population_for_per_capita=population_for_per_capita)  # , wb_isos=wb_isos, wb_regions=wb_regions
         # keep only year-columns
-        # regional_df = regional_df.drop(labels=[ 'IPCC-Annex', 'World Region', 'iso', 'name',], axis=1, errors='ignore')
+        # regional_df = regional_df.drop(labels=[ 'IPCC-Annex', 'World Region', 'iso3', 'name',], axis=1, errors='ignore')
         regional_df = regional_df.select_dtypes(include='number')
         regional_df = regional_df.transpose()
 

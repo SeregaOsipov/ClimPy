@@ -1,5 +1,6 @@
 import xarray as xr
 import pandas as pd
+import xoak
 from climpy.utils.wrf_utils import generate_xarray_uniform_time_data
 
 
@@ -20,6 +21,20 @@ def prep_wrf_emissions(fp):
         return ds
 
     emissions_ds = preprocess_ds(emissions_ds)
-    emissions_ds = emissions_ds.rename({'south_north':'latitude', 'west_east':'longitude'})
+    # emissions_ds = emissions_ds.rename({'south_north':'latitude', 'west_east':'longitude'})
+
+    return emissions_ds
+
+
+def prep_wrf_emissions_injecting_geo_em_coordinates(emissions_fp, geo_em_fp):
+    # Suuplements the missing the coordinates in emissions from geo_em file
+    geo_em_ds = xr.open_dataset(geo_em_fp)
+    geo_em_ds = geo_em_ds.isel(Time=0)
+
+    emissions_ds = xr.open_dataset(emissions_fp)#, chunks={'Time': 24})#, 'south_north': 10, 'west_east': 10})
+    emissions_ds['XLONG'] = geo_em_ds.XLONG_M
+    emissions_ds['XLAT'] = geo_em_ds.XLAT_M
+    emissions_ds = emissions_ds.set_coords(['XLAT', 'XLONG'])
+    emissions_ds.xoak.set_index(['XLAT', 'XLONG'], 'sklearn_geo_balltree')
 
     return emissions_ds
