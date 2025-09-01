@@ -104,8 +104,9 @@ def derive_additional_noahmp_diags(ds, ic_ds):
     # ds['water_storage_to_wt'] = 10**3 * noahmp_ds.SMCMAX * (-1*ds.ZWT) # 10**3 * m3/m3 * m = mm
     # ds['water_storage_to_wt'] = ds['water_storage_to_wt'].assign_attrs(units='mm', description='Water storage (potential) between surface and WT')
 
-    ds['IRSMFIVOL'] = ds['IRSIVOL'] + ds['IRMIVOL'] + ds['IRFIVOL']
-    ds['IRSMFIVOL'].attrs['description'] = 'Sprinkler + Micro + Flood irrigation amount'
-    ds['IRSMFIVOL'].attrs['units'] = ds['IRSIVOL'].units
+    if 'IRSIVOL' in ds.data_vars:  # not all sims have irrigation
+        ds['IRSMFIVOL'] = ds['IRSIVOL'] + ds['IRMIVOL'] + ds['IRFIVOL']
+        ds['IRSMFIVOL'].attrs['description'] = 'Sprinkler + Micro + Flood irrigation amount'
+        ds['IRSMFIVOL'].attrs['units'] = ds['IRSIVOL'].units
 
     return ds

@@ -70,7 +70,7 @@ pressure = wrf.getvar(nc_in, "pressure", timeidx=time_index, squeeze=False)
 export_to_netcdf(pressure)
 
 z_stag = wrf.getvar(nc_in, "zstag", timeidx=time_index, squeeze=False)
-z_stag.name = 'height_stag'
+# z_stag.name = 'height_stag'
 export_to_netcdf(z_stag)
 
 z_rho = wrf.getvar(nc_in, "z", timeidx=time_index, squeeze=False)
@@ -126,15 +126,17 @@ for var_key in ('so2', 'o3'):
     gas_dobson_units[:] = compute_column_from_vmr_profile(pressure * 10 ** 2, temperature, dz, gas_ppmv, z_dim_axis=z_dim_axis)
     export_to_netcdf(gas_dobson_units)
 
+# Column loadings moved to pp_wrf_column_loading.py
+
 # compute column loading (not Dobson units)
-for var_key in ('nh3', ):
-    gas_ppmv = wrf.getvar(nc_in, var_key, timeidx=time_index, squeeze=False)
-    gas_column = slp.copy()
-    gas_column.name = '{}_column'.format(var_key)
-    gas_column.attrs['units'] = 'molecules m^{-2}'
-    gas_column.attrs['description'] = '{} column for comparison with satellites'.format(var_key)
-    gas_column[:] = compute_column_from_vmr_profile(pressure * 10 ** 2, temperature, dz, gas_ppmv, z_dim_axis=z_dim_axis, in_DU=False)
-    export_to_netcdf(gas_column)
+# for var_key in ('nh3', ):
+#     gas_ppmv = wrf.getvar(nc_in, var_key, timeidx=time_index, squeeze=False)
+#     gas_column = slp.copy()
+#     gas_column.name = '{}_column'.format(var_key)
+#     gas_column.attrs['units'] = 'molecules m^{-2}'
+#     gas_column.attrs['description'] = '{} column for comparison with satellites'.format(var_key)
+#     gas_column[:] = compute_column_from_vmr_profile(pressure * 10 ** 2, temperature, dz, gas_ppmv, z_dim_axis=z_dim_axis, in_DU=False)
+#     export_to_netcdf(gas_column)
 
 
 print('DONE')
