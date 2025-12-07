@@ -2,6 +2,8 @@ import os as os
 from matplotlib import pyplot as plt
 import netCDF4
 import numpy as np
+from matplotlib.colors import LinearSegmentedColormap
+import cartopy
 from climpy.utils import wrf_utils as wrf_utils
 import pandas as pd
 
@@ -117,3 +119,44 @@ def new_figure_1_3_impl():
 def new_figure_3_3_impl(figsize=(1.5 * JGR_page_width_inches(), JGR_page_width_inches())):
     fig, axes = plt.subplots(nrows=3, ncols=3, figsize=figsize, constrained_layout=True)  # , dpi=MY_DPI
     return fig, axes
+
+
+def get_manual_colormap(name):
+    palette = None
+
+    match name:
+        case 'GEE_bbpcgyr':
+            palette = ['black', 'blue', 'purple', 'cyan', 'green', 'yellow', 'red']
+        case 'GEE_wbpcgyr':
+            palette = ['white', 'blue', 'purple', 'cyan', 'green', 'yellow', 'red']  # drop black as it makes difficult to see coastlines
+        case 'emissions':
+            palette = ['white', '#A7CAB7', 'cyan', '#2C5F2D', 'yellow', 'red', 'brown']
+        case 'emissions_v2':
+            palette = ['#EEEEEE', '#A7CAB7', 'cyan', '#2C5F2D', 'yellow', 'red', 'brown']
+
+    cm = LinearSegmentedColormap.from_list('GEE', palette, N=256)
+
+    return cm
+
+
+# Section: Maps with projections
+
+
+def prepare_map_axes(ax):
+    ax.coastlines()
+    ax.add_feature(cartopy.feature.BORDERS, linestyle=':', linewidth=0.5)
+    
+    
+def generate_logspaced_bins(min_value, max_value, bins_per_decade=5):
+    '''
+    Generate logspaced bins, so that 1 order of magnitude has specified number of bins
+    '''
+    if min_value <= 0 or max_value <= min_value:
+        raise ValueError("min_value must be positive and max_value must be greater than min_value")
+    
+    log_min = np.log10(min_value)
+    log_max = np.log10(max_value)
+    num_decades = log_max - log_min
+    num_points = int(np.ceil(num_decades * bins_per_decade)) + 1
+    bins = np.logspace(log_min, log_max, num_points)
+    return bins

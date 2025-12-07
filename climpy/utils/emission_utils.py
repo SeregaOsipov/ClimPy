@@ -2,11 +2,31 @@ import xarray as xr
 import pandas as pd
 import xoak
 from climpy.utils.wrf_utils import generate_xarray_uniform_time_data
+import functools
 
 
+def aggregate_variables_into_dim(func):
+    @functools.wraps(func)
+    def wrapper_decorator(*args, **kwargs):
+        aggregate_variables_into_dim = False
+        if 'aggregate_variables_into_dim' in kwargs:
+            aggregate_variables_into_dim = kwargs.pop('aggregate_variables_into_dim')
+
+        ds = func(*args, **kwargs)
+
+        if aggregate_variables_into_dim:
+            das = [ds[key] for key in ds.data_vars]
+            da = xr.concat(das, dim='species')
+            da['species'] = list(ds.data_vars)
+            da = da.rename('emissions')
+            ds = da
+
+        return ds
+    return wrapper_decorator
+
+
+@aggregate_variables_into_dim
 def prep_wrf_emissions(fp):
-    # fp = '/work/mm0062/b302074/Data/AirQuality/THOFA/emissions/HERMESv3_radm2_madesorgam_20230515_THOFA_EDGARv61_HTAPv3_voc_CAMS_ship_OMI_so2.nc'
-    # fp = '/Users/osipovs/Data/AirQuality/THOFA/emissions/HERMESv3_radm2_madesorgam_20230515_THOFA_EDGARv61_HTAPv3_voc_CAMS_ship_OMI_so2.nc'
     emissions_ds = xr.open_dataset(fp)
     emissions_ds = emissions_ds.isel(emissions_zdim=0)
 
@@ -21,13 +41,12 @@ def prep_wrf_emissions(fp):
         return ds
 
     emissions_ds = preprocess_ds(emissions_ds)
-    # emissions_ds = emissions_ds.rename({'south_north':'latitude', 'west_east':'longitude'})
-
     return emissions_ds
 
 
+
 def prep_wrf_emissions_injecting_geo_em_coordinates(emissions_fp, geo_em_fp):
-    # Suuplements the missing the coordinates in emissions from geo_em file
+    # Supplements the missing the coordinates in emissions from geo_em file
     geo_em_ds = xr.open_dataset(geo_em_fp)
     geo_em_ds = geo_em_ds.isel(Time=0)
 

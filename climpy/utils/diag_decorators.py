@@ -60,29 +60,6 @@ def pandas_time_interval_selection(func):
     return wrapper_decorator
 
 
-def temporal_sampling(func):
-    '''
-    This decorator reduces the temporal sampling of the data
-    :param func:
-    :return:
-    '''
-    @functools.wraps(func)
-    def wrapper_decorator(*args, **kwargs):
-        sampling_step = None
-        if 'sampling_step' in kwargs:
-            sampling_step = kwargs.pop('sampling_step')
-
-        vo = func(*args, **kwargs)
-
-        if sampling_step is not None:
-            vo['time'] = vo['time'][::sampling_step]
-            vo['lat'] = vo['lat'][::sampling_step]
-            vo['lon'] = vo['lon'][::sampling_step]
-            vo['data'] = vo['data'][::sampling_step]
-        return vo
-    return wrapper_decorator
-
-
 def convert_dates_to_years_since_first_date(func):
     '''
     # this will convert dates to years since the first date

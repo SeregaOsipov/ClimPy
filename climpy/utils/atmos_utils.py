@@ -8,6 +8,8 @@ from ambiance import Atmosphere
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
+DRY_AIR_MOLAR_MASS = 29 * 10 ** -3  # kg mol^-1
+
 
 def air_number_density(p, t):
     '''
@@ -33,8 +35,7 @@ def air_mass_density(p, t):
     :return: air density, (kg/m^3)
     '''
 
-    M = 29 * 10 ** -3  # kg mol^-1
-    air_rho = p / sp.constants.R / t * M
+    air_rho = p / sp.constants.R / t * DRY_AIR_MOLAR_MASS
 
     return air_rho
 
@@ -43,7 +44,7 @@ def compute_column_from_vmr_profile(p, t, dz, gas_ppmv, z_dim_axis=0, in_DU=True
     """
     Computes for a given gas profile the column loading (by default in Dobson Units (DU))
     :param p: in Pa
-    :param t: in K (regular,  not potential!)
+    :param t: in K (regular, not potential!)
     :param dz: in meters (derived from z_stag)
     :param gas_ppmv: gas profile in units of ppmv
     :param z_dim_axis:

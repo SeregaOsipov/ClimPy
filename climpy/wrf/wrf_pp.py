@@ -5,8 +5,10 @@ import xarray as xr
 import wrf as wrf
 from climpy.utils.atmos_utils import compute_column_from_vmr_profile
 import argparse
+from climpy.utils.wrf_utils import compute_stag_pressure
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
+
 
 '''
 Script derives several common diagnostics from WRF output, such as SO2 & O3 columns in DU
@@ -66,37 +68,15 @@ export_to_netcdf(twb)  # , mode='w')
 slp = wrf.getvar(nc_in, "slp", timeidx=time_index, squeeze=False)
 export_to_netcdf(slp)  # , mode='w')
 
-pressure = wrf.getvar(nc_in, "pressure", timeidx=time_index, squeeze=False)
+pressure, pressure_stag, p_sfc, dp, z_stag, dz = compute_stag_pressure(nc_in, timeidx=time_index, squeeze=False)
 export_to_netcdf(pressure)
-
-z_stag = wrf.getvar(nc_in, "zstag", timeidx=time_index, squeeze=False)
 # z_stag.name = 'height_stag'
 export_to_netcdf(z_stag)
+export_to_netcdf(dp)
+export_to_netcdf(dz)
 
 z_rho = wrf.getvar(nc_in, "z", timeidx=time_index, squeeze=False)
 export_to_netcdf(z_rho)
-
-# compute dP
-p_sfc = wrf.getvar(nc_in, 'PSFC', timeidx=time_index, squeeze=False) / 10**2
-pressure_stag = np.zeros(z_stag.shape)
-pressure_stag[:, 0] = p_sfc
-for layer_index in range(0, pressure.shape[z_dim_axis]):
-    half_dp = pressure_stag[:, layer_index] - pressure[:, layer_index]
-    pressure_stag[:, layer_index+1] = pressure_stag[:, layer_index] - half_dp * 2
-
-dp = pressure.copy()
-dp.name = 'dP'
-dp.attrs['description'] = 'layers thickness dP'
-dp[:] = -1 * np.diff(pressure_stag, axis=z_dim_axis)
-export_to_netcdf(dp)
-
-# dZ
-dz = dp.copy()
-dz.name = 'dZ'
-dz.attrs['description'] = 'layers thickness dZ'
-dz.attrs['units'] = 'm'
-dz[:] = np.diff(z_stag, axis=z_dim_axis)
-export_to_netcdf(dz)
 
 # compute center of mass for so2 and sulf
 for var_key in ('so2', 'sulf'):
