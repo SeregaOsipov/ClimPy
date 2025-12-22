@@ -104,6 +104,7 @@ elif tropomi_diag == 'NO2':
 ds_in = ds_in.squeeze()  # do the squeeze last after merging
 # ds_in = ds_in.assign_coords(time=[pd.to_datetime(ds_in.time_utc.values).mean()])  # original TROPOMI time is only accurate within a day. Take a mean of the exact time across the scanline and add to the dataset
 ds_in['time'][...] = pd.to_datetime(ds_in.time_utc.values).mean()
+# TODO: set time based on the file name
 
 ####### DONE TropOMI preparations
 

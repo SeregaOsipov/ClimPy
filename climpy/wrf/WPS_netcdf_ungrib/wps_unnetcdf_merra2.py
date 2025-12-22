@@ -30,21 +30,23 @@ python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_merra2.py --start_
 
 TODO: replace MERRA2 predownloading with the OpenDAP access
 
-To process by month in parallel, use wps_unnetcdf_merra2_monthly.sh
+To process by month in parallel, use wps_unnetcdf_merra2_in_parallel.sh
 '''
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--start_date", help="unnetcdf is similar to the WPS ungrib, provide the start and end dates in the YYYY-MM-DD format")
 parser.add_argument("--end_date", help="unnetcdf is similar to the WPS ungrib, provide the end date in the YYYY-MM-DD format")
 parser.add_argument("--mode", "--port", help="the are only to support pycharm debugging")
+parser.add_argument("--MERRA2_STORAGE_PATH", help="where MERRA2 files are", default='/project/k10048/Data/NASA/MERRA2/')
+parser.add_argument("--out_storage_path", help="where to put unnetcdf files", default='/project/k10048/Data/NASA/MERRA2/unnetcdf/')  # /scratch/osipovs/Data/NASA/MERRA2/unnetcdf/
 args = parser.parse_args()
 
-out_storage_path = '/home/osipovs/workspace/WRF/Data/unnetcdf/'
-out_storage_path = '/project/k1090/osipovs/Data/NASA/MERRA2/unnetcdf/'
-out_storage_path = '/work/mm0062/b302074/Data/NASA/MERRA2/unnetcdf/'
-# out_storage_path = '/Users/osipovs2/Temp/'  # local debug
+# out_storage_path = '/home/osipovs/workspace/WRF/Data/unnetcdf/'
+# out_storage_path = '/project/k1090/osipovs/Data/NASA/MERRA2/unnetcdf/'
+# out_storage_path = '/work/mm0062/b302074/Data/NASA/MERRA2/unnetcdf/'
+
 try:
-    os.makedirs(out_storage_path)
+    os.makedirs(args.out_storage_path)
 except FileExistsError:
     print('probably unnetcdf storage directory already exists')
 
@@ -86,11 +88,11 @@ for requested_date in requested_dates:
 
     # create output file_paths: sfc & ml. Existing files will be destroyed
     # if you want nondestructive logic - implement it here
-    out_file_name_sfc = out_storage_path + '/FILE_unnc_' + 'sfc' + ':' + requested_date.strftime('%Y-%m-%d_%H')
+    out_file_name_sfc = args.out_storage_path + '/FILE_unnc_' + 'sfc' + ':' + requested_date.strftime('%Y-%m-%d_%H')
     print('Creating file ' + out_file_name_sfc)
     f_sfc = open(out_file_name_sfc, 'wb')
 
-    out_file_name_ml = out_storage_path + '/FILE_unnc_' + 'ml' + ':' + requested_date.strftime('%Y-%m-%d_%H')
+    out_file_name_ml = args.out_storage_path + '/FILE_unnc_' + 'ml' + ':' + requested_date.strftime('%Y-%m-%d_%H')
     print('Creating file ' + out_file_name_ml)
     f_ml = open(out_file_name_ml, 'wb')
 
@@ -98,7 +100,7 @@ for requested_date in requested_dates:
         var_list = dataset['vars']
         print('DATA SET is {} and the list of variables to process is {}'.format(dataset['name'], dataset['vars']))
 
-        nc_file_path, is_df_time_invariant = get_merra2_file_path(dataset['name'], requested_date)
+        nc_file_path, is_df_time_invariant = get_merra2_file_path(dataset['name'], requested_date, args.MERRA2_STORAGE_PATH)
 
         time_dependent_df = xr.open_dataset(nc_file_path)
         if is_df_time_invariant:  # time invariant data sets should only have one element in time dimension
@@ -110,8 +112,8 @@ for requested_date in requested_dates:
         # deduce is it a surface or model levels file
         n_vert_levels = 1
         f = f_sfc
-        if _FIELD_MAP['level'] in df.dims.keys():
-            n_vert_levels = df.dims[_FIELD_MAP['level']]
+        if _FIELD_MAP['level'] in df.sizes.keys():
+            n_vert_levels = df.sizes[_FIELD_MAP['level']]
             f = f_ml
 
         for var_key in var_list:

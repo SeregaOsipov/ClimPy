@@ -126,10 +126,10 @@ def derive_land_sea_merra2(nc_data, df, level_index):
     nc_data['slab'] = nc_data['slab'].where(water_fraction >= 0.5, 1)
 
 
-def derive_3d_pressure_merra2(nc_data, df, level_index):
+def derive_3d_pressure_merra2(nc_data, merra_ds, level_index):
     # To get the pressure for a selected layer, I still have to build the entire 3d field first
-    pressure_stag, pressure_rho = derive_merra2_pressure_profile(df)
-    nc_data['slab'] = pressure_rho.isel(lev=level_index)
+    derive_merra2_pressure_profile(merra_ds)
+    nc_data['slab'] = merra_ds.p_rho.isel(lev=level_index)
 
 
 def interpolate_soil_temperatures_merra2(nc_data, nc, time_index, level_index):
@@ -383,8 +383,9 @@ def prepare_nc_data(df, _FIELD_MAP, var_key, level_index, map_projection_version
     nc_var_key = _FIELD_MAP[var_key].netcdf_var_key
 
     nc_data = {}
-    nc_data['nx'] = df.dims[_FIELD_MAP['longitude']]
-    nc_data['ny'] = df.dims[_FIELD_MAP['latitude']]
+    nc_data['nx'] = df.sizes[_FIELD_MAP['longitude']]
+    nc_data['ny'] = df.sizes[_FIELD_MAP['latitude']]
+
     nc_data['units'] = ''
     if hasattr(df.variables[nc_var_key], 'units'):
         nc_data['units'] = df.variables[nc_var_key].units
@@ -594,10 +595,10 @@ def wrf_write(f, nc_data):
     # f.close()
 
 
-def get_merra2_file_path(dataset_name, requested_date):
-    MERRA2_STORAGE_PATH = '/home/osipovs/workspace/WRF/Data/merra2'
-    MERRA2_STORAGE_PATH = '/project/k1090/osipovs/Data/NASA/MERRA2/'
-    MERRA2_STORAGE_PATH = '/work/mm0062/b302074/Data/NASA/MERRA2/'
+def get_merra2_file_path(dataset_name, requested_date, MERRA2_STORAGE_PATH='/project/k10048/Data/NASA/MERRA2/'):
+    # MERRA2_STORAGE_PATH = '/home/osipovs/workspace/WRF/Data/merra2'
+    # MERRA2_STORAGE_PATH = '/work/mm0062/b302074/Data/NASA/MERRA2/'
+
     name_prefix = 'MERRA2_400.'
     date_str = '.' + requested_date.strftime('%Y%m%d') + '.'
 

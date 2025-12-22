@@ -16,7 +16,6 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 https://pubs.geoscienceworld.org/sepm/jsedres/article/71/3/365/114077/aerodynamic-and-geometric-diameters-of-airborne
 Conventionally, an aerodynamic diameter is taken as a product of the geometric diameter and the square root of particle density.
 
-
 Run like this:
 gogomamba
 campaign=THOFA
@@ -36,8 +35,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--mode", help="pycharm")
 parser.add_argument("--port", help="pycharm")
 parser.add_argument("--host", help="pycharm")
-parser.add_argument("--wrf_in", help="wrf input file path", default='/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/wrfout_d01_2017-11-16_00_00_00')#'/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/cdo/wrfout_d01_timmean')
-parser.add_argument("--wrf_out", help="wrf output file path", default='/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/pp_health/wrfout_d01_2017-11-16_00_00_00')#'/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/cdo/pp_health/wrfout_d01_timmean')
+parser.add_argument("--wrf_in", help="wrf input file path")#, default='/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/wrfout_d01_2017-11-16_00_00_00')#'/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/cdo/wrfout_d01_timmean')
+parser.add_argument("--wrf_out", help="wrf output file path")#, default='/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/pp_health/wrfout_d01_2017-11-16_00_00_00')#'/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/cdo/pp_health/wrfout_d01_timmean')
 parser.add_argument("--pm_input_is_aerodynamic_diameter", help="True/False", type=strtobool, default=True)
 args = parser.parse_args()
 

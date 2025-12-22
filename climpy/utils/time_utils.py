@@ -3,8 +3,16 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import time
+import argparse
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
+
+
+def argsparse_datetime(date_str):
+    try:
+        return dt.datetime.strptime(date_str, '%Y-%m-%d_%H:%M:%S')
+    except ValueError:
+        raise argparse.ArgumentTypeError('Not a valid date: "{0}".'.format(date_str))
 
 
 def to_datetime(date):  # np.datetime64 -> datetime
@@ -15,8 +23,7 @@ def to_datetime(date):  # np.datetime64 -> datetime
     Output:
       DATE - a python datetime object
     """
-    timestamp = ((date - np.datetime64('1970-01-01T00:00:00'))
-                 / np.timedelta64(1, 's'))
+    timestamp = ((date - np.datetime64('1970-01-01T00:00:00')) / np.timedelta64(1, 's'))
     return datetime.utcfromtimestamp(timestamp)
 
 

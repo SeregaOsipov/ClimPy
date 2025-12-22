@@ -3,6 +3,7 @@ import pandas as pd
 from climpy.utils.file_path_utils import get_root_storage_path_on_hpc
 from climpy.utils.world_bank_utils import inject_region_info
 import os
+import xarray as xr
 # import pycountry
 
 @inject_region_info
@@ -49,3 +50,24 @@ def get_cams_emissions(drop_ocean=True):
     # df[df['country.id']==0].iso3.unique()
 
     return df
+
+
+def derive_cams_pressure_profile(reanalysis_ml_ds, reanalysis_sfc_ds):
+    '''
+    The 'pv' array usually contains all A values followed by all B values
+
+    :param reanalysis_ml_ds:
+    :param reanalysis_sfc_ds:
+    :return:
+    '''
+
+    # derive A and B coefficients (hybrid sigma-pressure vertical grid)
+    pv = reanalysis_ml_ds.ch4_c.GRIB_pv
+    num_levels = reanalysis_ml_ds.sizes['level']
+    a = pv[:num_levels + 1]
+    b = pv[num_levels + 1:]
+    reanalysis_ml_ds['a'] = xr.DataArray(a, dims=('level_stag',))
+    reanalysis_ml_ds['b'] = xr.DataArray(b, dims=('level_stag',))
+
+    reanalysis_ml_ds['p_stag'] = reanalysis_ml_ds.a + reanalysis_ml_ds.b * reanalysis_sfc_ds.sp
+    reanalysis_ml_ds['p_rho'] = reanalysis_ml_ds.p_stag.rolling(level_stag=2).mean().isel(level_stag=slice(1, None)).rename({'level_stag': 'level'})

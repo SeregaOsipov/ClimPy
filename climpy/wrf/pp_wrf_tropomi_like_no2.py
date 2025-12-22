@@ -33,12 +33,12 @@ args = parser.parse_args()
 #%%
 # d01
 args.wrf_in = '/scratch/osipovs/Data/AirQuality/THOFA/chem_100_v2025.0/wrfout_d01_2023-06-01_00_00_00'
-args.wrf_out = '/scratch/osipovs/Data/AirQuality/THOFA/chem_100_v2025.0/pp/tropomi_like/wrfout_d01_2023-06-01_00_00_00'
+args.wrf_out = '/scratch/osipovs/Data/AirQuality/THOFA/chem_100_v2025.0/pp/tropomi_like_no2/wrfout_d01_2023-06-01_00_00_00'
 args.tropomi_in = '/project/k10048/osipovs/Data/Copernicus/Sentinel-5P/d01/S5P_OFFL_L2__NO2____20230601T081351_20230601T095521_29183_03_020500_20230603T044537.nc'
 
 #d02
 args.wrf_in = '/scratch/osipovs/Data/AirQuality/THOFA/inversion/v5/run_srs_ref/wrfout_d01_2023-06-10_00_00_00'
-args.wrf_out = '/scratch/osipovs/Data/AirQuality/THOFA/inversion/v5/run_srs_ref/pp/tropomi_like/wrfout_d01_2023-06-10_00_00_00'
+args.wrf_out = '/scratch/osipovs/Data/AirQuality/THOFA/inversion/v5/run_srs_ref/pp/tropomi_like_no2/wrfout_d01_2023-06-10_00_00_00'
 args.tropomi_in = '/project/k10048/osipovs/Data/Copernicus/Sentinel-5P/d02/S5P_OFFL_L2__NO2____20230610T084541_20230610T102711_29311_03_020500_20230612T004757.nc'
 
 print('Will process this WRF:\nin {}\nout {}'.format(args.wrf_in, args.wrf_out))

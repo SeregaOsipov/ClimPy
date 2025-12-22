@@ -11,11 +11,6 @@ from scipy import interpolate
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
-Z_DIM_NC_KEY = 'bottom_top'
-
-
-################### TROPOMI Section
-
 
 def column_averaging_1d_impl(wrf_da_1d, wrf_pressure_1d, tropomi_pressure_bins_1d):
     '''
@@ -348,11 +343,11 @@ def create_times_var(dates):
 
 
 def derive_wrf_cells_area(ds):
-    # defmapfactor_mx = ds.variables['MAPFAC_MX'][0]
-    # mapfactor_my = ds.variables['MAPFAC_MY'][0]
-    # dx = getattr(ds, 'DX')  # m
-    # dy = getattr(ds, 'DY')
-    # cell_area = np.ones(mapfactor_mx.shape) * dx / mapfactor_mx * dy / mapfactor_my
-
     cell_area = ds.DX / ds.MAPFAC_MX * ds.DY /ds.MAPFAC_MY
     return cell_area
+
+
+def derive_wrf_pressure_from_met_and_input_files(wrf_met_ds, wrf_ic_ds):
+    with xr.set_options(keep_attrs=True):
+        wrf_met_ds['p_rho'] = wrf_ic_ds.P_TOP + (wrf_met_ds.PSFC - wrf_ic_ds.P_TOP) * wrf_ic_ds.ZNU
+    wrf_met_ds.p_rho.attrs['description'] = 'Pressure at eta values on half (mass) levels'

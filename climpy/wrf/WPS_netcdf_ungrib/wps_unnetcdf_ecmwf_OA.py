@@ -6,16 +6,8 @@ from climpy.wrf.WPS_netcdf_ungrib.wps_unnetcdf_utils import prepare_nc_data, wrf
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
-
-
-
-
 # //TODO: REDO THE LOGIC SIMILAR TO MERRA2
-
 # //TODO: check the projection variables
-
-
-
 
 # The script is designed for the ECMWF Operational Analysis
 # See http://www2.mmm.ucar.edu/wrf/users/docs/user_guide/users_guide_chap3.html  # _Writing_Meteorological_Data
@@ -37,7 +29,6 @@ _FIELD_MAP = _FIELD_MAP_ECMWF_OA_2_WRF
 # nc_file_path = '/shaheen/project/k1090/osipovs/Data/temp_download/ECMWF-OA/netcdf/global/F1280/ml/ECMWF-OA_ml_20160101_00.nc'
 # nc_file_path = '/shaheen/project/k1090/osipovs/Data/temp_download/ECMWF-OA/netcdf/global/F1280/ml/ECMWF-OA_ml_20160101_06.nc'
 nc = netCDF4.Dataset(nc_file_path)
-
 
 var_list = nc.variables.keys()
 var_list = list(var_list)
