@@ -34,7 +34,8 @@ QA_THRESHOLDS = {
 def get_tropomi_configs():
     ch4_settings = SimpleNamespace(diag_key='ch4', tropomi_key='methane_mixing_ratio_bias_corrected')#, wrf_key='xch4_like_tropomi')
     no2_settings = SimpleNamespace(diag_key='no2', tropomi_key='nitrogendioxide_tropospheric_column')#, wrf_key='trop_no2_column_like_tropomi')
-    return ch4_settings, no2_settings
+    so2_settings = SimpleNamespace(diag_key='so2', tropomi_key='sulfurdioxide_total_vertical_column')
+    return ch4_settings, no2_settings, so2_settings
 
 
 def get_wrf_polygon(wrf_file_path):
@@ -178,6 +179,10 @@ def derive_tropomi_no2_pressure_grid(tropomi_ds):
         # derive pressure
         tropomi_ds['p_rho'] = tropomi_ds.p_stag.mean(dim='vertices')
         tropomi_ds.p_rho.attrs['long_name'] = 'rho pressure grid'
+
+
+def derive_tropomi_so2_pressure_grid(tropomi_ds):
+    derive_tropomi_no2_pressure_grid(tropomi_ds)
 
 
 def prep_tropomi_data(fp):
