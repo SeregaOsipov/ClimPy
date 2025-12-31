@@ -5,6 +5,11 @@ from climpy.utils.wrf_chem_made_utils import get_wrf_size_distribution_by_modes
 from climpy.utils.refractive_index_utils import mix_refractive_index
 import climpy.utils.mie_utils as mie
 from distutils.util import strtobool
+from pathlib import Path
+import dask_mpi
+from dask.distributed import Client
+import os
+import socket
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
@@ -13,6 +18,35 @@ This script derives optical properties from WRF output
 Currently only column AOD for MADE only (log-normal pdfs)
 
 Ackermann MADE paper: https://www.sciencedirect.com/science/article/pii/S1352231098000065
+
+Conclusions:
+1. Dask is faster than no dask
+2. Daily WRF WITHOUT phase functions, fits into single node on SHaheen 3 (~ 90/384 GB)
+
+
+LEVANTE:
+add --constraint=512G if you need more memory
+yearly
+sbatch --job-name=wrf_optics_pp --account=mm0062 --time=8:00:00 --partition=compute -N 1 --wrap="source ~/.bashrc; gogomamba; python -u ${CLIMPY}climpy/wrf/wrf_pp_optics.py --sum_up_modes=False --wrf_in=/work/mm0062/b302074/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean --wrf_out=/work/mm0062/b302074/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean_optics_by_mode"
+
+
+Shaheen 3 (Dask):
+sbatch --job-name=wrf_optics_pp_dask --account=k10009 --time=8:00:00 --partition=workq -N 2 --ntasks=48 --ntasks-per-node=24 --cpus-per-task=8 --hint=nomultithread <<'EOT'
+sbatch --job-name=wrf_optics_pp_dask --account=k10009 --time=8:00:00 --partition=workq -N 1 --ntasks=48 --ntasks-per-node=48 --cpus-per-task=4 --hint=nomultithread <<'EOT'
+#!/bin/bash -l
+source /project/k10066/osipovs/.commonrc; gogomamba; mamba activate py311;
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
+srun --mpi=pmi2 -c $SLURM_CPUS_PER_TASK -n $SLURM_NTASKS -N ${SLURM_NNODES} --cpu-bind=cores --hint=nomultithread \
+    python -u ${CLIMPY}/climpy/wrf/wrf_pp_optics.py --sum_up_modes=False --wrf_in=/scratch/osipovs/Data/AirQuality/THOFA/chem_100_v2025.0/wrfout_d01_2023-06-01_00_00_00 --wrf_out=/scratch/osipovs/Data/AirQuality/THOFA/chem_100_v2025.0/pp/optics/wrfout_d01_2023-06-01_00_00_00
+wait  # Add this to wait for workers to finish their internal cleanup
+EOT
+
+
+LOCAL:
+python -u  ${CLIMPY}/climpy/wrf/wrf_pp_optics.py --sum_up_modes=True --wrf_in=/home/osipovs/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean --wrf_out=/home/osipovs/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean_optics
+python -u  ${CLIMPY}/climpy/wrf/wrf_pp_optics.py --sum_up_modes=False --wrf_in=/home/osipovs/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean --wrf_out=/home/osipovs/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean_optics_by_mode
+
 
 run EMME AQ projection sims suite:
 
@@ -39,17 +73,6 @@ do
     sbatch --job-name=wrf_optics_pp --account=mm0062 --time=8:00:00 --partition=compute -N 1 --wrap="source ~/.bashrc; gogomamba; python -u ${CLIMPY}climpy/wrf/wrf_pp_optics.py --sum_up_modes=False --wrf_in=/work/mm0062/b302074/Data/AirQuality/EMME/2050/$scenario/chem_100_v1/output/cdo/wrfout_d01_2050-07_monmean --wrf_out=/work/mm0062/b302074/Data/AirQuality/EMME/2050/$scenario/chem_100_v1/output/pp_optics/wrfout_d01_2050-07_monmean_optics_by_mode"
     sbatch --job-name=wrf_optics_pp --account=mm0062 --time=8:00:00 --partition=compute -N 1 --wrap="source ~/.bashrc; gogomamba; python -u ${CLIMPY}climpy/wrf/wrf_pp_optics.py --sum_up_modes=False --wrf_in=/work/mm0062/b302074/Data/AirQuality/EMME/2050/$scenario/chem_100_v1/output/cdo/wrfout_d01_2050-10_monmean --wrf_out=/work/mm0062/b302074/Data/AirQuality/EMME/2050/$scenario/chem_100_v1/output/pp_optics/wrfout_d01_2050-10_monmean_optics_by_mode"
 done
-
-
-run examples
-levante:
-add --constraint=512G if you need more memory
-yearly
-sbatch --job-name=wrf_optics_pp --account=mm0062 --time=8:00:00 --partition=compute -N 1 --wrap="source ~/.bashrc; gogomamba; python -u ${CLIMPY}climpy/wrf/wrf_pp_optics.py --sum_up_modes=False --wrf_in=/work/mm0062/b302074/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean --wrf_out=/work/mm0062/b302074/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean_optics_by_mode"
-
-local:
-python -u  ${CLIMPY}/climpy/wrf/wrf_pp_optics.py --sum_up_modes=True --wrf_in=/home/osipovs/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean --wrf_out=/home/osipovs/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean_optics
-python -u  ${CLIMPY}/climpy/wrf/wrf_pp_optics.py --sum_up_modes=False --wrf_in=/home/osipovs/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean --wrf_out=/home/osipovs/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_timmean_optics_by_mode
 '''
 
 parser = argparse.ArgumentParser()
@@ -60,13 +83,9 @@ parser.add_argument("--sum_up_modes", help="True/False, sum up aerosol ijk modes
 args = parser.parse_args()
 
 #DEBUG
-# args.sum_up_modes = False
-#local
-# annual
-
-args.wrf_in='/HDD2/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/cdo//wrfout_d01_timmean'
-args.wrf_out = '/HDD2/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/wrfout_d01_timmean_optics_by_mode'
-args.sum_up_modes=False
+# args.wrf_in='/scratch/osipovs/Data/AirQuality/THOFA/chem_100_v2025.0/wrfout_d01_2023-06-01_00_00_00'
+# args.wrf_out = '/scratch/osipovs/Data/AirQuality/THOFA/chem_100_v2025.0/pp/optics/wrfout_d01_2023-06-01_00_00_00'
+# args.sum_up_modes=False
 # monmean
 # args.wrf_in='/HDD2/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_monmean'
 # args.wrf_out = '/HDD2/Data/AirQuality/EMME/2050/HLT/chem_100_v1/output/pp_optics/merge/wrfout_d01_monmean_optics'
@@ -81,12 +100,11 @@ maritime_wavelengths = np.array([380, 440, 500, 675, 870]) / 10 ** 3  # aeronet
 wavelengths = np.unique(np.append(default_wrf_wavelengths, maritime_wavelengths))  # Comprehensive wl grid
 
 wavelengths = np.array([0.55, 10])  # SW & LW
-
 #%% dask implementation
 
 
-def calculate_mie(ri_ds):
-    mie_das = xr.apply_ufunc(mie.get_mie_efficiencies_numpy, ri_ds.chunk({'time': 1, "south_north": 45, 'west_east': 45}).ri,
+def calculate_mie(ri_ds, dN_ds):
+    mie_das = xr.apply_ufunc(mie.get_mie_efficiencies_numpy, ri_ds.ri,  # .chunk({'time': 1, "south_north": 45, 'west_east': 45})
                              dN_ds['radius'], ri_ds['wavelength'],
                              input_core_dims=[["wavelength"], ["radius"], ['wavelength']],
                              output_core_dims=[["wavelength", 'radius'], ["wavelength", 'radius'],
@@ -103,39 +121,86 @@ def calculate_mie(ri_ds):
         da.name = key
 
     mie_ds = xr.merge(mie_das)
-    mie_ds.load()
+    #mie_ds.load()  # Loading may cause the script to crash due to memory limits
 
     return mie_ds
 
 
 #%%
+def initialize_dask_client():
+    dask_local_directory = f"/scratch/{os.environ.get('USER')}/dask_tmp_{os.environ.get('SLURM_JOB_ID')}"
+
+    # Shaheen 3: https://docs.hpc.kaust.edu.sa/soft_env/science_platforms/data_science/big_data_proc/dask/shaheen3.html
+    dask_mpi.initialize(
+        interface="hsn0",  # Use Shaheen 3 high-speed network
+        local_directory=dask_local_directory,
+        memory_limit='auto',  # per worker limit. Let Dask determine limit from SLURM_MEM_PER_NODE
+        nthreads=int(os.environ.get('SLURM_CPUS_PER_TASK', 1)),
+        dashboard_address=":8787",  # This fixes the port
+    )
+
+    print('Starting Dask Client')
+    print(f'Dask local directory: {dask_local_directory}')
+    print('SLURM_JOB_ID: ' + os.environ.get('SLURM_JOB_ID'))
+    print('SLURM_CPUS_PER_TASK: ' + os.environ.get('SLURM_CPUS_PER_TASK'))
+
+    client = Client()  # Connect the client to the scheduler (automatically found since it's in the same MPI group)
+    print(f'Dask MPI Client is ready: {client}')
+
+    host = socket.gethostname()
+    user = os.environ.get('USER')
+    print("Run this command on your LOCAL LAPTOP (not on Shaheen):")
+    print(f"  ssh -L 8787:{host}:8787 {user}@shaheen.hpc.kaust.edu.sa")
+    print(f"  ssh -fN -L 8787:{host}:8787 shaheen")
+    print("Dashboard: http://localhost:8787/status")
+    print('To cancel port forwarding')
+    print(f"  ssh -O cancel -L 8787:{host}:8787 shaheen")
+
+    return client
+
+#%%
 if __name__ == '__main__':
     # %%
-    print('Starting Dask Client')
-    from dask.distributed import Client
-
     # client = Client(n_workers=10, threads_per_worker=1, memory_limit='10GB')  # Local. memory_limit is per worker
-    client = Client(n_workers=50, threads_per_worker=1, memory_limit='5GB')  # levante
-    print('Client is ready {}'.format(client))  # http://127.0.0.1:8787/status
+    # client = Client(n_workers=50, threads_per_worker=1, memory_limit='5GB')  # levante
+    do_dask = True
+    if do_dask: client = initialize_dask_client()
     #%%
     print('Will process this WRF:\nin {}\nout {}'.format(args.wrf_in, args.wrf_out))
     xr_in = xr.open_dataset(args.wrf_in, chunks={'XTIME': 1, "south_north": 45, 'west_east': 45})
+    xr_in = xr_in.rename_dims({'Time':'time'})
     xr_in = xr_in.rename({'XTIME': 'time', 'XLAT': 'lat', 'XLONG': 'lon'})  # , 'west_east':'lon', 'south_north':'lat'})
     # %% Derive spectral column AOD
     ri_ds = mix_refractive_index(xr_in, chem_opt, wavelengths)  # volume weighted RI
     # ri_ds = ri_ds.rename({'XTIME': 'time', 'XLAT':'lat', 'XLONG':'lon', 'west_east':'lon', 'south_north':'lat'})
+    # ri_ds = ri_ds.chunk({'time': 1, 'south_north': 45, 'west_east': 45})
+
     # dA_ds = get_wrf_size_distribution_by_modes(xr_in, moment='dA', sum_up_modes=True, column=True)
     # dA_ds = dA_ds.rename({'XTIME': 'time', 'XLAT':'lat', 'XLONG':'lon'})
     dN_ds = get_wrf_size_distribution_by_modes(xr_in, moment='dN', sum_up_modes=args.sum_up_modes, column=True)
     # dV_ds = get_wrf_size_distribution_by_modes(xr_in, moment='dV', sum_up_modes=True, column=True)
     # dN_ds_by_modes = get_wrf_size_distribution_by_modes(xr_in, sum_up_modes=False, column=True)
     print('SD is ready')
+
+    # Rechunk to reduce graph size
+    # dN_ds = dN_ds.chunk({'time': 1, 'south_north': 45, 'west_east': 45})
     #%% get mie and integrate over SD
-    mie_ds = calculate_mie(ri_ds)
-    # dN_ds = dN_ds.chunk({"south_north": 45, 'west_east': 45})
-    op_ds = mie.integrate_mie_over_aerosol_size_distribution(mie_ds, dN_ds, include_phase_function=False)  # phase function has very large memory footprint
+    mie_ds = calculate_mie(ri_ds, dN_ds)
+    # Critical Performance Tuning: by dropping phase functions, the script should fit into a single node memory
+    include_phase_function=False
+    if not include_phase_function:  # performance step
+        mie_ds = mie_ds.drop_vars(['phase_function', 'phase_function_angles_in_radians'])
+        mie_ds.load()
+
+    print('Mie is ready')
+    # mie_ds = mie_ds.chunk({'time': 1, 'south_north': 45, 'west_east': 45})
+    op_ds = mie.integrate_mie_over_aerosol_size_distribution(mie_ds, dN_ds, include_phase_function=include_phase_function)  # phase function has very large memory footprint
+    print('OP is ready')
+    Path(args.wrf_out).parent.mkdir(parents=True, exist_ok=True)  # # 2. Extract the parent directory and create it
     op_ds.to_netcdf(args.wrf_out)
     print('DONE: {}'.format(args.wrf_out))
+
+    if do_dask: client.close()
 #%% debugging subset
 # dsize=15
 # ri_ds = ri_ds.isel(south_north=slice(0,dsize), west_east=slice(0,dsize))
