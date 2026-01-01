@@ -82,7 +82,7 @@ def interpolation_in_pressure_1d_impl(wrf_da_1d, wrf_pressure_1d, tropomi_pressu
 
 
 def interpolate_wrf_diag_to_tropomi_rho_pressure_grid(wrf_ds, wrf_key, tropomi_ds):
-    print('Remember that interpolated NO2 profile will contain NaNs if TROPOMI top is above WRF top')
+    print('Remember that interpolated DIAG profile will contain NaNs if TROPOMI top is above WRF top')
     da = xr.apply_ufunc(interpolation_in_pressure_1d_impl, wrf_ds[wrf_key], wrf_ds.pressure, tropomi_ds.p_rho, tropomi_ds.qa_value,
                         input_core_dims=[['bottom_top'], ['bottom_top'], ['layer'],[]],
                         output_core_dims=[['layer']],

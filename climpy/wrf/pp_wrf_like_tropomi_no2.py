@@ -20,6 +20,8 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 '''
 Script derives TROPOMI-specific diagnostics to enable WRF-Chem-TROPOMI comparison.
 
+TROPOMI User Guide: https://sentinels.copernicus.eu/documents/247904/2474726/Sentinel-5P-Level-2-Product-User-Manual-Nitrogen-Dioxide.pdf#page=24.09
+
 # sbatch $BASH_SCRIPTS/pp_wrf_column_average_ensemble.sh /scratch/osipovs/Data/AirQuality/THOFA/inversion/v5/run_srs_revised/wrfout_d01_2023-06-01_00_00_00 /scratch/osipovs/Data/AirQuality/THOFA/inversion/v5/run_srs_revised/pp/column/wrfout_d01_2023-06-01_00_00_00
 
 '''
@@ -30,7 +32,7 @@ def pp_wrf_like_tropomi_no2(args):
     # %% Prep WRF
     wrf_ds = xr.open_dataset(args.wrf_in)
     if 'XTIME' in wrf_ds.dims:
-        wrf_ds = wrf_ds.rename({'XTIME': 'Time'}).rename({'Time': 'time'})
+        wrf_ds = wrf_ds.rename({'XTIME': 'time'})
     else:
         wrf_ds['time'] = generate_xarray_uniform_time_data(wrf_ds.Times)
         wrf_ds = wrf_ds.rename({'Time': 'time'})
@@ -38,8 +40,7 @@ def pp_wrf_like_tropomi_no2(args):
     tropomi_ds = xr.open_dataset(args.tropomi_in)
     derive_tropomi_no2_pressure_grid(tropomi_ds)
     # %% Minimize the WRF ds size and interpolate in time
-    # tropomi_ds['time'] = dt.datetime.fromisoformat('2023-06-01T14:25:00')  # hardcore time
-    keys = ['PH', 'PHB', 'P', 'PB', 'PSFC', 'ZNW', 'MUB', 'MU'] + ['ch4', 'no2']
+    keys = ['PH', 'PHB', 'P', 'PB', 'PSFC', 'ZNW', 'MUB', 'MU'] + ['no2']
     wrf_ds = wrf_ds[keys]
     wrf_ds = wrf_ds.interp(time=tropomi_ds.time, method='linear')
     # %% Deriving intermediate diagnostics
@@ -47,8 +48,6 @@ def pp_wrf_like_tropomi_no2(args):
     compute_p(wrf_ds)
     compute_stag_p(wrf_ds)
     calculate_air_mass_dry(wrf_ds)
-
-    derive_tropomi_no2_pressure_grid(tropomi_ds)
     # %%
     print('Remember that interpolated NO2 profile will contain NaNs if TROPOMI top is above WRF top')
     da = interpolate_wrf_diag_to_tropomi_rho_pressure_grid(wrf_ds, 'air_mass_dry', tropomi_ds)
@@ -88,6 +87,6 @@ if __name__ == "__main__":
     # # d02
     # args.wrf_in = '/scratch/osipovs/Data/AirQuality/THOFA/inversion/v5/run_srs_ref/wrfout_d01_2023-06-10_00_00_00'
     # args.wrf_out = '/scratch/osipovs/Data/AirQuality/THOFA/inversion/v5/run_srs_ref/pp/tropomi_like_no2/wrfout_d01_2023-06-10_00_00_00'
-    # args.tropomi_in = '/project/k10048/osipovs/Data/Copernicus/Sentinel-5P/d02/S5P_OFFL_L2__NO2____20230610T084541_20230610T102711_29311_03_020500_20230612T004757.nc'
+    # args.tropomi_in = '/project/k10048/osipovs/Data/Copernicus/Sentinel-5P/THOFA_d02/S5P_OFFL_L2__NO2____20230610T084541_20230610T102711_29311_03_020500_20230612T004757.nc'
 
     pp_wrf_like_tropomi_no2(args)
