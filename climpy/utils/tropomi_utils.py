@@ -26,7 +26,7 @@ QA_THRESHOLDS = {
     'nitrogendioxide_tropospheric_column': 0.75,
     'methane_mixing_ratio_bias_corrected': 0.8,
     'formaldehyde_tropospheric_vertical_column': 0.5,
-    'sulfurdioxide_total_vertical_column': 0.5,
+    'sulfurdioxide_total_vertical_column': 0.75,  # 0.75 is stricter, otherwise 0.5
     'carbonmonoxide_total_vertical_column': 0.5,
     'ozone_profile': 0.5
 }
@@ -35,7 +35,7 @@ QA_THRESHOLDS = {
 def get_tropomi_configs():
     ch4_settings = SimpleNamespace(diag_key='ch4', tropomi_key='methane_mixing_ratio_bias_corrected')#, wrf_key='xch4_like_tropomi')
     no2_settings = SimpleNamespace(diag_key='no2', tropomi_key='nitrogendioxide_tropospheric_column')#, wrf_key='trop_no2_column_like_tropomi')
-    so2_settings = SimpleNamespace(diag_key='so2', tropomi_key='sulfurdioxide_total_vertical_column')
+    so2_settings = SimpleNamespace(diag_key='so2', tropomi_key='sulfurdioxide_total_vertical_column')  # , wrf_key='trop_no2_column_like_tropomi')
     return ch4_settings, no2_settings, so2_settings
 
 
@@ -187,7 +187,15 @@ def derive_tropomi_no2_pressure_grid(tropomi_ds):
 
 
 def derive_tropomi_so2_pressure_grid(tropomi_ds):
-    derive_tropomi_no2_pressure_grid(tropomi_ds)
+    '''
+    Vertical Grid: https://sentiwiki.copernicus.eu/__attachments/1673595/S5P-L2-DLR-PUM-400E%20-%20Sentinel-5P%20Level%202%20Product%20User%20Manual%20Sulphur%20Dioxide%20SO2%202024%20-%202.8.0.pdf#page=19.52
+    :param tropomi_ds:
+    :return:
+    '''
+    with xr.set_options(keep_attrs=True):
+        tropomi_ds['p_rho'] = tropomi_ds.tm5_constant_a + tropomi_ds.tm5_constant_b * tropomi_ds.surface_pressure
+        tropomi_ds.p_rho.attrs['units'] = tropomi_ds.surface_pressure.units
+        tropomi_ds.p_rho.attrs['long_name'] = 'rho pressure grid'
 
 
 def derive_tropomi_o3_pr_pressure_grid(tropomi_ds):
@@ -198,7 +206,9 @@ def derive_tropomi_o3_pr_pressure_grid(tropomi_ds):
 
 def prep_tropomi_data(fp):
     ds = xr.open_dataset(fp, group='PRODUCT')
-    ds = ds.set_coords(['latitude', 'longitude'])
+    if 'latitude' in ds.coords:
+        ds = ds.rename({'latitude': 'lat', 'longitude': 'lon'})
+    ds = ds.set_coords(['lat', 'lon'])
     ds = ds.squeeze()
 
     meta_ds = xr.open_dataset(fp, group='METADATA')

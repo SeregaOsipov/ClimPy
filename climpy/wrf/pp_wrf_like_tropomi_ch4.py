@@ -18,6 +18,8 @@ __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 '''
 Script derives TROPOMI-specific diagnostics to enable WRF-Chem-TROPOMI comparison.
 
+TROPOMI User Guide: https://sentinels.copernicus.eu/documents/247904/2474726/Sentinel-5P-Level-2-Product-User-Manual-Methane.pdf#page=19.59
+
 # Individual run
 wrf_in=/scratch/osipovs/Data/AirQuality/THOFA/inversion/v5/run_srs_ref/wrfout_d01_2023-06-10_00_00_00
 wrf_out=/scratch/osipovs/Data/AirQuality/THOFA/inversion/v5/run_srs_ref/pp/tropomi_like_ch4/wrfout_d01_2023-06-10_00_00_00
@@ -34,7 +36,7 @@ def pp_wrf_like_tropomi_ch4(args):
     # %% Prep WRF
     wrf_ds = xr.open_dataset(args.wrf_in)
     if 'XTIME' in wrf_ds.dims:
-        wrf_ds = wrf_ds.rename({'XTIME': 'Time'}).rename({'Time': 'time'})
+        wrf_ds = wrf_ds.rename({'XTIME': 'time'})
     else:
         wrf_ds['time'] = generate_xarray_uniform_time_data(wrf_ds.Times)
         wrf_ds = wrf_ds.rename({'Time': 'time'})
@@ -51,15 +53,11 @@ def pp_wrf_like_tropomi_ch4(args):
     compute_p(wrf_ds)
     compute_stag_p(wrf_ds)
     calculate_air_mass_dry(wrf_ds)
-
-    derive_tropomi_ch4_pressure_grid(tropomi_ds)
     # %% Derive xch4 TROPOMI-like diagnostic
     # See Eq 3 in https://sentinels.copernicus.eu/documents/247904/2474726/Sentinel-5P-Level-2-Product-User-Manual-Methane.pdf#page=19.59
-    da = average_wrf_diag_between_tropomi_staggered_pressure_grid(wrf_ds, 'ch4', tropomi_ds)
-    wrf_ds['xch4'] = da  # get wrf ch4 mixing ratio averaged between tropomi levels
-
-    da = average_wrf_diag_between_tropomi_staggered_pressure_grid(wrf_ds, 'air_mass_dry', tropomi_ds)
-    wrf_ds['dvair'] = da / DRY_AIR_MOLAR_MASS  # mol/m2 = kg / m^2 / (kg mol-1)  # dry air column
+    wrf_ds['xch4'] = average_wrf_diag_between_tropomi_staggered_pressure_grid(wrf_ds, 'ch4', tropomi_ds)
+    wrf_ds['dvair'] = average_wrf_diag_between_tropomi_staggered_pressure_grid(wrf_ds, 'air_mass_dry', tropomi_ds)
+    wrf_ds['dvair'] /= DRY_AIR_MOLAR_MASS  # mol/m2 = kg / m^2 / (kg mol-1)  # dry air column
 
     wrf_ds['dvch4'] = 10 ** -6 * wrf_ds['xch4'] * wrf_ds['dvair']  # mol/m2 of methane
     wrf_ds['vch4'] = tropomi_ds.methane_profile_apriori.sum(dim='layer') + (tropomi_ds.column_averaging_kernel * (wrf_ds['dvch4'] - tropomi_ds.methane_profile_apriori)).sum(dim='layer')
@@ -85,7 +83,6 @@ if __name__ == "__main__":
     parser.add_argument("--wrf_out", help="wrf output file path")  # , default='/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/pp_wrf/wrfout_d01_2017-12-14_00_00_00')
     parser.add_argument("--tropomi_in", help="File path to TROPOMI L2 orbit")  # , default='/work/mm0062/b302074/Data/AirQuality/EMME/2017/chem_100_v1/output/wrfout_d01_2017-12-14_00_00_00')
     args = parser.parse_args()
-
     # %%
     # args.wrf_in = '/scratch/osipovs/Data/AirQuality/THOFA/inversion/v4/run_srs_ref/wrfout_d01_2023-06-10_00_00_00'
     # args.wrf_out = '/scratch/osipovs/Data/AirQuality/THOFA/inversion/v4/run_srs_ref/pp/tropomi_like_ch4/wrfout_d01_2023-06-10_00_00_00'
