@@ -19,7 +19,7 @@ from netCDF4 import Dataset
 from wrf import getvar, geo_bounds
 
 SENTINEL_DATA_ROOT_PATH = get_root_storage_path_on_hpc() + '/Data/Copernicus/Sentinel-5P/'
-TROPOMI_in_WRF_KEYS = ['ch4', 'o3', 'hcho', 'so2', 'co', 'no2',]
+TROPOMI_in_WRF_KEYS = ['ch4', 'o3', 'hcho', 'so2', 'co', 'no2', 'o3_pr']
 
 # Define QA mapping for different keys. Default to 0.5 if key is not found, as it's the standard for most species
 QA_THRESHOLDS = {
@@ -27,7 +27,8 @@ QA_THRESHOLDS = {
     'methane_mixing_ratio_bias_corrected': 0.8,
     'formaldehyde_tropospheric_vertical_column': 0.5,
     'sulfurdioxide_total_vertical_column': 0.75,  # 0.75 is stricter, otherwise 0.5
-    'carbonmonoxide_total_vertical_column': 0.5
+    'carbonmonoxide_total_vertical_column': 0.5,
+    'ozone_profile': 0.5
 }
 
 
@@ -36,6 +37,10 @@ def get_tropomi_configs():
     no2_settings = SimpleNamespace(diag_key='no2', tropomi_key='nitrogendioxide_tropospheric_column')#, wrf_key='trop_no2_column_like_tropomi')
     so2_settings = SimpleNamespace(diag_key='so2', tropomi_key='sulfurdioxide_total_vertical_column')  # , wrf_key='trop_no2_column_like_tropomi')
     return ch4_settings, no2_settings, so2_settings
+
+
+def get_tropomi_o3_profile_config():
+    return SimpleNamespace(diag_key='o3_pr', tropomi_key='ozone_profile')
 
 
 def get_wrf_polygon(wrf_file_path):
@@ -190,6 +195,12 @@ def derive_tropomi_so2_pressure_grid(tropomi_ds):
     with xr.set_options(keep_attrs=True):
         tropomi_ds['p_rho'] = tropomi_ds.tm5_constant_a + tropomi_ds.tm5_constant_b * tropomi_ds.surface_pressure
         tropomi_ds.p_rho.attrs['units'] = tropomi_ds.surface_pressure.units
+        tropomi_ds.p_rho.attrs['long_name'] = 'rho pressure grid'
+
+
+def derive_tropomi_o3_pr_pressure_grid(tropomi_ds):
+    with xr.set_options(keep_attrs=True):
+        tropomi_ds['p_rho'] = tropomi_ds.pressure
         tropomi_ds.p_rho.attrs['long_name'] = 'rho pressure grid'
 
 

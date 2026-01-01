@@ -74,16 +74,18 @@ def regrid_tropomi_on_wrf_grid(args):
         print('Processing NO2 switch')
         keys = ['nitrogendioxide_tropospheric_column', 'qa_value', 'time_utc', 'averaging_kernel', 'air_mass_factor_troposphere', 'air_mass_factor_total', 'tm5_constant_a', 'tm5_constant_b', 'tm5_tropopause_layer_index']
         ds_in = xr.merge([product_ds[keys], lat_b, lon_b, input_data_ds[['surface_pressure']]])
-        ds_in = ds_in.set_coords(['tm5_constant_a', 'tm5_constant_b'])  # set as coordinates to avoid losing them, as they don't depend on lat/lon
-    elif diag_key == 'SO2':
-        print('Processing SO2 switch')
-        keys = ['sulfurdioxide_total_vertical_column', 'qa_value', 'time_utc']
-        ds_in = xr.merge([product_ds[keys], lat_b, lon_b, details_ds[['averaging_kernel', 'sulfurdioxide_profile_apriori']], input_data_ds[['surface_pressure', 'tm5_constant_a', 'tm5_constant_b']]])
-        ds_in = ds_in.set_coords(['tm5_constant_a', 'tm5_constant_b'])  # set as coordinates to avoid losing them, as they don't depend on lat/lon
-    else:
-        raise Exception('diag key is not recognized')
+        ds_in = ds_in.set_coords(['tm5_constant_a', 'tm5_constant_b'])  # set as coordinates to avoid loosing them, as they don't depend on lat/lon
+    elif tropomi_diag == 'O3__PR':
+        print('Processing O3 Profile switch')
+        # Common O3 Profile keys. Note: 'pressure' is often in PRODUCT group for profiles, or SUPPORT_DATA.
+        # Assuming pressure is available in PRODUCT or we merge it.
+        # If averaging_kernel is in SUPPORT_DATA/DETAILED_RESULTS, use details_ds.
+        # If ozone_profile_apriori is in SUPPORT_DATA/INPUT_DATA, use input_data_ds.
+        # pressure usually in PRODUCT for profile products.
+        keys = ['ozone_profile', 'qa_value', 'time_utc', 'pressure']
+        # Add apriori and AK if needed. AK is crucial for profiles.
+        ds_in = xr.merge([product_ds[keys], lat_b, lon_b, details_ds[['averaging_kernel']], input_data_ds[['ozone_profile_apriori']]])
 
-    ds_in = ds_in.set_coords(['lat_b', 'lon_b'])
     ds_in = ds_in.squeeze()  # do the squeeze last after merging
     # ds_in = ds_in.assign_coords(time=[pd.to_datetime(ds_in.time_utc.values).mean()])  # original TROPOMI time is only accurate within a day. Take a mean of the exact time across the scanline and add to the dataset
     # ds_in['time'][...] = pd.to_datetime(ds_in.time_utc.values).mean()  # TODO: SO2 product reports "-" instead of time. A work around is to combine time_delta + time_reference
