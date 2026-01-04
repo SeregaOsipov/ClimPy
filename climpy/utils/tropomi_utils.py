@@ -33,14 +33,16 @@ QA_THRESHOLDS = {
 
 
 def get_tropomi_configs():
-    ch4_settings = SimpleNamespace(diag_key='ch4', tropomi_key='methane_mixing_ratio_bias_corrected')#, wrf_key='xch4_like_tropomi')
-    no2_settings = SimpleNamespace(diag_key='no2', tropomi_key='nitrogendioxide_tropospheric_column')#, wrf_key='trop_no2_column_like_tropomi')
-    so2_settings = SimpleNamespace(diag_key='so2', tropomi_key='sulfurdioxide_total_vertical_column')  # , wrf_key='trop_no2_column_like_tropomi')
-    return ch4_settings, no2_settings, so2_settings
-
-
-def get_tropomi_o3_profile_config():
-    return SimpleNamespace(diag_key='o3_pr', tropomi_key='ozone_profile')
+    '''
+    cdse_tropomi_key: used in online request to CDSE
+    tropomi_nc_key: variable name in the TROPOMI netcdf file
+    :return:
+    '''
+    ch4_settings = SimpleNamespace(diag_key='ch4', tropomi_nc_key='methane_mixing_ratio_bias_corrected', cdse_tropomi_key='L2__CH4___')
+    no2_settings = SimpleNamespace(diag_key='no2', tropomi_key='nitrogendioxide_tropospheric_column', cdse_tropomi_key='L2__NO2___')
+    so2_settings = SimpleNamespace(diag_key='so2', tropomi_key='sulfurdioxide_total_vertical_column', cdse_tropomi_key='L2__SO2___')
+    o3_settings = SimpleNamespace(diag_key='o3', tropomi_key='ozone_profile', cdse_tropomi_key='L2__O3__PR')
+    return ch4_settings, no2_settings, so2_settings, o3_settings
 
 
 def get_wrf_polygon(wrf_file_path):
@@ -69,13 +71,13 @@ def configure_tropomi_credentials():
     os.environ['CDSE_S3_SECRET'] = 'nOf3MHPhj0EzIP3xpP3nEebHUgJAnXPyCs1HAWRq'
 
 
-def fetch_tropomi_from_wrf_folder(key, folder_path, wrf_date_format='%Y-%m-%d_%H_%M_%S'):
+def fetch_tropomi_from_wrf_folder(config, wrf_date_format='%Y-%m-%d_%H_%M_%S'):
     '''
     The goal: Given the folder with WRF output, get the list of overlapping TROPOMI files
     '''
 
     # 1. Get list of wrfout files
-    fps = sorted(glob.glob(os.path.join(folder_path, "wrfout_d*")))
+    fps = sorted(glob.glob(os.path.join(config.wrf_output_folder_path, "wrfout_d*")))
     if not fps:
         print("No wrfout files found in the directory.")
         return None
@@ -95,7 +97,6 @@ def fetch_tropomi_from_wrf_folder(key, folder_path, wrf_date_format='%Y-%m-%d_%H
     end_date = max(wrf_dates).strftime('%Y-%m-%d')
 
     # 4. Construct OData Query
-    tropomi_key = f'L2__{key.upper()}___'
     base_url = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
 
     query_filter = (
@@ -104,13 +105,14 @@ def fetch_tropomi_from_wrf_folder(key, folder_path, wrf_date_format='%Y-%m-%d_%H
         f"and ContentDate/Start lt {end_date}T23:59:59.000Z "
         f"and OData.CSC.Intersects(area=geography'SRID=4326;{wkt_polygon}') "
         f"and Attributes/OData.CSC.StringAttribute/any(att:att/Name eq 'productType' "
-        f"and (att/OData.CSC.StringAttribute/Value eq '{tropomi_key}'))"
+        f"and (att/OData.CSC.StringAttribute/Value eq '{config.cdse_tropomi_key}'))"
     )
 
     full_url = f"{base_url}?{query_filter}&$top=1000&$expand=Attributes&$orderby=ContentDate/Start"
+    # print(full_url)
 
     # 5. Execute Request
-    print(f"Searching {key} from {start_date} to {end_date}")
+    print(f"Searching {config.cdse_tropomi_key} from {start_date} to {end_date}")
     print(f"Bounds: {west}, {south} to {east}, {north}")
 
     response = requests.get(full_url)

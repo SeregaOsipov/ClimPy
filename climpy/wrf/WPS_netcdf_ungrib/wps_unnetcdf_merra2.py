@@ -7,6 +7,7 @@ from dateutil import rrule
 import os
 from climpy.wrf.WPS_netcdf_ungrib.wps_unnetcdf_utils import prepare_nc_data, wrf_write, _FIELD_MAP_MERRA_2_WRF, \
     get_merra2_file_path, LATLON_PROJECTION, format_hdate
+import pandas as pd
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
@@ -27,48 +28,31 @@ These are some of the MERRA2 docs for quick reference
 
 Run command example:
 python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_merra2.py --start_date=2017-01-01 --end_date=2017-06-15 >& log.unnetcdf_2017_jan-jun
+# On Compute Node
+python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_merra2.py --start_date=2023-05-15 --end_date=2023-06-01 --out_storage_path=/scratch/osipovs/Data/NASA/MERRA2/unnetcdf/ >& log.unnetcdf_2023_05
 
 TODO: replace MERRA2 predownloading with the OpenDAP access
 
 To process by month in parallel, use wps_unnetcdf_merra2_in_parallel.sh
+
 '''
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--start_date", help="unnetcdf is similar to the WPS ungrib, provide the start and end dates in the YYYY-MM-DD format")
-parser.add_argument("--end_date", help="unnetcdf is similar to the WPS ungrib, provide the end date in the YYYY-MM-DD format")
 parser.add_argument("--mode", "--port", help="the are only to support pycharm debugging")
+parser.add_argument("--start_date", help="2023-05-15")
+parser.add_argument("--end_date", help="2023-06-01")
 parser.add_argument("--MERRA2_STORAGE_PATH", help="where MERRA2 files are", default='/project/k10048/Data/NASA/MERRA2/')
 parser.add_argument("--out_storage_path", help="where to put unnetcdf files", default='/project/k10048/Data/NASA/MERRA2/unnetcdf/')  # /scratch/osipovs/Data/NASA/MERRA2/unnetcdf/
 args = parser.parse_args()
 
-# out_storage_path = '/home/osipovs/workspace/WRF/Data/unnetcdf/'
-# out_storage_path = '/project/k1090/osipovs/Data/NASA/MERRA2/unnetcdf/'
-# out_storage_path = '/work/mm0062/b302074/Data/NASA/MERRA2/unnetcdf/'
+# args.out_storage_path = '/scratch/osipovs/Data/NASA/MERRA2/unnetcdf/'
+# args.start_date = '2023-05-15'
+# args.end_date = '2023-06-01'
 
-try:
-    os.makedirs(args.out_storage_path)
-except FileExistsError:
-    print('probably unnetcdf storage directory already exists')
-
-
-start_date = dt.datetime(2017, 1, 1)
-end_date = dt.datetime(2017, 1, 2)
-if args.start_date:
-    start_date = dt.datetime.strptime(args.start_date, '%Y-%m-%d')
-if args.end_date:
-    end_date = dt.datetime.strptime(args.end_date, '%Y-%m-%d')
-
-print('start and end dates are: {} and {}'.format(start_date, end_date))
-
-# given the start, end dates and interval, generate the list of exact time stamps to be processed
-
-requested_dates = list(rrule.rrule(rrule.HOURLY, interval=3, dtstart=start_date, until=end_date))
-requested_dates = requested_dates[:-1]
-
-
-# this map holds nc name to field conversion, see Vtable
-_FIELD_MAP = _FIELD_MAP_MERRA_2_WRF
-
+print('start and end dates are: {} and {}'.format(args.start_date, args.end_date))
+os.makedirs(args.out_storage_path, exist_ok=True)
+requested_dates = pd.period_range(start=args.start_date, end=args.end_date, freq='3h')
+_FIELD_MAP = _FIELD_MAP_MERRA_2_WRF  # this map holds nc name to field conversion, see Vtable
 
 # MERRA stores data in separate datasets/files
 # build the list of the datasets and variables to extract from them
@@ -79,20 +63,23 @@ dataset_2d_const = {"name": "const_2d_asm_Nx", "vars": list(_FIELD_MAP.keys())[8
 # dataset_3d = {"name": "inst3_3d_asm_Nv", "vars": list(_FIELD_MAP.keys())[19:25]}
 dataset_2d_land = {"name": "tavg1_2d_lnd_Nx", "vars": list(_FIELD_MAP.keys())[10:22]}
 dataset_3d = {"name": "inst3_3d_asm_Nv", "vars": list(_FIELD_MAP.keys())[22:28]}
-# list of the all the datasets to process
+
+# list of all datasets to process
 datasets = (dataset_2d, dataset_2d_ocn, dataset_2d_const, dataset_2d_land, dataset_3d)
 datasets = (dataset_2d_const, dataset_2d, dataset_2d_ocn, dataset_2d_land, dataset_3d)
 
-for requested_date in requested_dates:
+for raw_date in requested_dates:
+    requested_date = raw_date.to_timestamp()
+    requested_date_str = requested_date.strftime('%Y-%m-%d_%H')
     print('Processing date {}'.format(requested_date))
 
     # create output file_paths: sfc & ml. Existing files will be destroyed
     # if you want nondestructive logic - implement it here
-    out_file_name_sfc = args.out_storage_path + '/FILE_unnc_' + 'sfc' + ':' + requested_date.strftime('%Y-%m-%d_%H')
+    out_file_name_sfc = args.out_storage_path + '/FILE_unnc_' + 'sfc' + ':' + requested_date_str
     print('Creating file ' + out_file_name_sfc)
     f_sfc = open(out_file_name_sfc, 'wb')
 
-    out_file_name_ml = args.out_storage_path + '/FILE_unnc_' + 'ml' + ':' + requested_date.strftime('%Y-%m-%d_%H')
+    out_file_name_ml = args.out_storage_path + '/FILE_unnc_' + 'ml' + ':' + requested_date_str
     print('Creating file ' + out_file_name_ml)
     f_ml = open(out_file_name_ml, 'wb')
 
@@ -102,25 +89,25 @@ for requested_date in requested_dates:
 
         nc_file_path, is_df_time_invariant = get_merra2_file_path(dataset['name'], requested_date, args.MERRA2_STORAGE_PATH)
 
-        time_dependent_df = xr.open_dataset(nc_file_path)
+        time_dependent_ds = xr.open_dataset(nc_file_path)
         if is_df_time_invariant:  # time invariant data sets should only have one element in time dimension
-            df = time_dependent_df.isel(time=0)
+            ds = time_dependent_ds.isel(time=0)
         else:  # Ocean data are 30 minutes shifted relative to atmosphere. Allow 30 minutes tolerance
-            df = time_dependent_df.sel(time=requested_date, drop=True, method='nearest', tolerance=np.timedelta64(30,'m'))  # do the time selection.
-            df['time'] = requested_date  # have to store the date somewhere
+            ds = time_dependent_ds.sel(time=requested_date, drop=True, method='nearest', tolerance=np.timedelta64(30, 'm'))  # do the time selection.
+            ds['time'] = requested_date  # have to store the date somewhere
 
         # deduce is it a surface or model levels file
         n_vert_levels = 1
         f = f_sfc
-        if _FIELD_MAP['level'] in df.sizes.keys():
-            n_vert_levels = df.sizes[_FIELD_MAP['level']]
+        if _FIELD_MAP['level'] in ds.sizes.keys():
+            n_vert_levels = ds.sizes[_FIELD_MAP['level']]
             f = f_ml
 
         for var_key in var_list:
             print('processing variable {}'.format(var_key))
             for level_index in range(n_vert_levels):
                 print('processing level {}'.format(level_index))
-                nc_data = prepare_nc_data(df, _FIELD_MAP, var_key, level_index, LATLON_PROJECTION)
+                nc_data = prepare_nc_data(ds, _FIELD_MAP, var_key, level_index, LATLON_PROJECTION)
 
                 if _FIELD_MAP[var_key].override_time:
                     # in general the date has to be identical, but constant fields may prescribe it for the wrong date
