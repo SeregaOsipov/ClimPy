@@ -1,7 +1,8 @@
 from datetime import datetime
 import numpy as np
+from numba import DeprecationError
+import xoak
 import climpy.utils.netcdf_utils as nc_utils
-# from libs.readers import AbstractNetCdfReader as ancr
 import matplotlib.pyplot as plt
 import xarray as xr
 import wrf as wrf
@@ -33,7 +34,7 @@ def column_averaging_1d_impl(wrf_da_1d, wrf_pressure_1d, tropomi_pressure_bins_1
 
     s = pd.Series(wrf_da_1d, index=wrf_pressure_1d)
     bins = pd.cut(s.index, bins=tropomi_pressure_bins_1d, include_lowest=True)
-    binned_mean = s.groupby(bins).mean().values
+    binned_mean = s.groupby(bins, observed=True).mean().values
     # return wrf_da_1d.groupby_bins('pressure', tropomi_da_1d)
 
     # return binned_mean
@@ -212,8 +213,8 @@ def inject_geo_em_coordinates(ds, geo_em_fp):
 
     ds['XLONG'] = geo_em_ds.XLONG_M
     ds['XLAT'] = geo_em_ds.XLAT_M
-    ds = ds.set_coords(['XLAT', 'XLONG'])  # TODO: make use of it everywhere
-    # ds.xoak.set_index(['XLAT', 'XLONG'], 'sklearn_geo_balltree')
+    ds = ds.set_coords(['XLAT', 'XLONG'])
+    ds.xoak.set_index(['XLAT', 'XLONG'], 'sklearn_geo_balltree')
 
     return ds
 
@@ -302,7 +303,24 @@ def prepare_wrf_net_flux(nc, acc_down_name, acc_up_name, tyxSlicesArray, land_ma
     return net
 
 
+def fix_time_variable_in_wrf_output(ds):
+    if 'XTIME' in ds.dims:
+        ds = ds.rename({'XTIME': 'time'})
+    else:
+        time_datetime = pd.to_datetime(ds.Times.astype(str).str.replace('_', ' '))
+        ds = ds.assign(Time=time_datetime)
+        if 'Times' in ds.data_vars.keys():
+            ds = ds.drop_vars('Times')
+        ds = ds.rename({'Time': 'time'})
+
+    if ds.time.dtype != 'datetime64[ns]':  # Fix the issue when WRF time data is treated as US instead of NS
+        ds['time'] = ds.time.astype('datetime64[ns]')
+
+    return ds
+
+
 def generate_netcdf_uniform_time_data(time_variable, td1=None, td2=None):
+    raise DeprecationError("This logic is no longer compatible. Replace with fix_time_variable_in_wrf_output")
     if td1 is None:
         # td1 = dt.datetime.strptime(str(netCDF4.chartostring(time_variable[0])), '%Y-%m-%d_%H:%M:%S')
         td1 = datetime.strptime(''.join([char.decode("utf-8") for char in time_variable[0]]), '%Y-%m-%d_%H:%M:%S')
@@ -314,6 +332,7 @@ def generate_netcdf_uniform_time_data(time_variable, td1=None, td2=None):
 
 
 def generate_xarray_uniform_time_data(time_variable, td1=None, td2=None):
+    raise DeprecationError("This logic is no longer compatible. Replace with fix_time_variable_in_wrf_output")
     if td1 is None:
         td1 = datetime.strptime(time_variable[0].values.tostring().decode("utf-8"), '%Y-%m-%d_%H:%M:%S')
     if td2 is None:

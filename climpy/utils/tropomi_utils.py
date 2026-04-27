@@ -1,25 +1,26 @@
+import glob
+import os
+from argparse import Namespace
+from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
+import requests
 import xarray as xr
 from cartopy import crs as ccrs, feature as cfeature
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 from matplotlib import pyplot as plt
-from climpy.utils.file_path_utils import get_root_path_on_hpc, get_root_storage_path_on_hpc
-import os
-import glob
-import requests
-import pandas as pd
+from matplotlib import ticker
 from netCDF4 import Dataset
+from pystac_client import Client
 from wrf import geo_bounds
-from datetime import datetime
-from argparse import Namespace
+
+from climpy.utils.file_path_utils import get_root_storage_path_on_hpc
 from examples.regridding.regrid_tropomi_on_wrf_grid import regrid_tropomi_on_wrf_grid
-from netCDF4 import Dataset
-from wrf import getvar, geo_bounds
 
 SENTINEL_DATA_ROOT_PATH = get_root_storage_path_on_hpc() + '/Data/Copernicus/Sentinel-5P/'
-TROPOMI_in_WRF_KEYS = ['ch4', 'o3', 'hcho', 'so2', 'co', 'no2', 'o3_pr']
+TROPOMI_in_WRF_KEYS = ['ch4', 'o3', 'hcho', 'chocho', 'so2', 'co', 'no2', 'o3_pr']
 
 # Define QA mapping for different keys. Default to 0.5 if key is not found, as it's the standard for most species
 QA_THRESHOLDS = {
@@ -27,22 +28,26 @@ QA_THRESHOLDS = {
     'methane_mixing_ratio_bias_corrected': 0.8,
     'formaldehyde_tropospheric_vertical_column': 0.5,
     'sulfurdioxide_total_vertical_column': 0.75,  # 0.75 is stricter, otherwise 0.5
-    'carbonmonoxide_total_vertical_column': 0.5,
+    'carbonmonoxide_total_column_corrected': 0.5,
     'ozone_profile': 0.5
 }
 
 
-def get_tropomi_configs():
+def get_tropomi_species_configs():
     '''
     cdse_tropomi_key: used in online request to CDSE
-    tropomi_nc_key: variable name in the TROPOMI netcdf file
+    tropomi_key: variable name in the TROPOMI netcdf file
     :return:
     '''
-    ch4_settings = SimpleNamespace(diag_key='ch4', tropomi_nc_key='methane_mixing_ratio_bias_corrected', cdse_tropomi_key='L2__CH4___')
+    ch4_settings = SimpleNamespace(diag_key='ch4', tropomi_key='methane_mixing_ratio_bias_corrected', cdse_tropomi_key='L2__CH4___')
     no2_settings = SimpleNamespace(diag_key='no2', tropomi_key='nitrogendioxide_tropospheric_column', cdse_tropomi_key='L2__NO2___')
     so2_settings = SimpleNamespace(diag_key='so2', tropomi_key='sulfurdioxide_total_vertical_column', cdse_tropomi_key='L2__SO2___')
-    o3_settings = SimpleNamespace(diag_key='o3', tropomi_key='ozone_profile', cdse_tropomi_key='L2__O3__PR')
-    return ch4_settings, no2_settings, so2_settings, o3_settings
+    # o3_settings = SimpleNamespace(diag_key='o3', tropomi_key='ozone_profile', cdse_tropomi_key='L2__O3__PR')
+    co_settings = SimpleNamespace(diag_key='co', tropomi_key='carbonmonoxide_total_column_corrected', cdse_tropomi_key='L2__CO____')
+    hcho_settings = SimpleNamespace(diag_key='hcho', tropomi_key='formaldehyde_tropospheric_vertical_column', cdse_tropomi_key='L2__HCHO__')
+    chocho_settings = SimpleNamespace(diag_key='chocho', tropomi_key='glyoxal_tropospheric_vertical_column', cdse_tropomi_key='L2__CHOCHO__')
+    # return [ch4_settings, no2_settings, so2_settings, o3_settings, co_settings, hcho_settings]
+    return [ch4_settings, no2_settings, so2_settings, co_settings, hcho_settings, chocho_settings]
 
 
 def get_wrf_polygon(wrf_file_path):
@@ -71,6 +76,100 @@ def configure_tropomi_credentials():
     os.environ['CDSE_S3_SECRET'] = 'nOf3MHPhj0EzIP3xpP3nEebHUgJAnXPyCs1HAWRq'
 
 
+def fetch_tropomi_metadata_online(start_date, end_date, wkt_polygon, cdse_tropomi_key):
+    # 4. Construct OData Query
+    base_url = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
+
+    query_filter = (
+        f"$filter=Collection/Name eq 'SENTINEL-5P' "
+        f"and ContentDate/Start gt {start_date}T00:00:00.000Z "
+        f"and ContentDate/Start lt {end_date}T23:59:59.000Z "
+        f"and OData.CSC.Intersects(area=geography'SRID=4326;{wkt_polygon}') "
+        f"and Attributes/OData.CSC.StringAttribute/any(att:att/Name eq 'productType' "
+        f"and (att/OData.CSC.StringAttribute/Value eq '{cdse_tropomi_key}'))"
+    )
+
+    full_url = f"{base_url}?{query_filter}&$top=1000&$expand=Attributes&$orderby=ContentDate/Start"
+    # print(full_url)
+
+    # 5. Execute Request
+    response = requests.get(full_url)
+    if response.status_code != 200:
+        print(f"API Error: {response.status_code}")
+        return pd.DataFrame()
+
+    df = pd.DataFrame.from_dict(response.json()['value'])
+
+    # Filter for Offline (OFFL) as per your original requirement
+    if not df.empty:
+        df = df[df['Name'].str.contains('OFFL', case=False, na=False)]
+
+    return df
+
+
+def fetch_tropomi_chocho_metadata_online(start_time, end_time, bbox, download_dir=None):
+    """
+    Queries the S5P-PAL STAC API for CHOCHO orbits.
+    Defaults perfectly match the THOFA CDSE OData query:
+    Time: June 2023
+    Bounding Box: [min_lon, min_lat, max_lon, max_lat] = [44, 22, 57, 35]
+    """
+    # Debug
+    # start_time = "2023-06-01T00:00:00Z"
+    # end_time = "2023-07-01T00:00:00Z"
+    # bbox = [44.0, 22.0, 57.0, 35.0]
+
+    if download_dir is None:
+        download_dir = SENTINEL_DATA_ROOT_PATH
+
+    # Connect to the S5P-PAL STAC Catalog
+    catalog_url = "https://data-portal.s5p-pal.com/api/s5p-l2"
+    client = Client.open(catalog_url)
+
+    # Format datetime exactly as requested by the STAC API (Start/End)
+    time_filter = f"{start_time}/{end_time}"
+
+    print(f"Searching S5P-PAL for l2__chocho between {time_filter} in bbox {bbox}...")
+
+    search = client.search(
+        datetime=time_filter,
+        bbox=bbox,
+        collections=['L2__CHOCHO'],
+        limit=100  # Matches your &$top=100 filter
+    )
+
+    items = list(search.items())
+    meta_records = []
+    for item in items:
+        # --- OFFICIAL S5P-PAL ASSET PARSING ---
+        product = item.assets["product"]
+        extra_fields = product.extra_fields
+
+        download_url = product.href
+        safe_filename = extra_fields["file:local_path"]
+        expected_size = extra_fields["file:size"]
+        # --------------------------------------
+
+        filepath = os.path.join(download_dir, safe_filename)
+
+        meta_records.append({
+            'Name': safe_filename,
+            'safe_filename': safe_filename,
+            'download_url': download_url,
+            'tropomi_granule_fp': filepath,
+            'expected_size': expected_size
+        })
+
+    meta_df = pd.DataFrame(meta_records)
+
+    if not meta_df.empty:
+        print(f"Successfully loaded {len(meta_df)} CHOCHO orbits.")
+    else:
+        print("No CHOCHO orbits found for this query.")
+
+    return meta_df
+
+
 def fetch_tropomi_from_wrf_folder(config, wrf_date_format='%Y-%m-%d_%H_%M_%S'):
     '''
     The goal: Given the folder with WRF output, get the list of overlapping TROPOMI files
@@ -96,47 +195,24 @@ def fetch_tropomi_from_wrf_folder(config, wrf_date_format='%Y-%m-%d_%H_%M_%S'):
     start_date = min(wrf_dates).strftime('%Y-%m-%d')
     end_date = max(wrf_dates).strftime('%Y-%m-%d')
 
-    # 4. Construct OData Query
-    base_url = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
-
-    query_filter = (
-        f"$filter=Collection/Name eq 'SENTINEL-5P' "
-        f"and ContentDate/Start gt {start_date}T00:00:00.000Z "
-        f"and ContentDate/Start lt {end_date}T23:59:59.000Z "
-        f"and OData.CSC.Intersects(area=geography'SRID=4326;{wkt_polygon}') "
-        f"and Attributes/OData.CSC.StringAttribute/any(att:att/Name eq 'productType' "
-        f"and (att/OData.CSC.StringAttribute/Value eq '{config.cdse_tropomi_key}'))"
-    )
-
-    full_url = f"{base_url}?{query_filter}&$top=1000&$expand=Attributes&$orderby=ContentDate/Start"
-    # print(full_url)
-
-    # 5. Execute Request
     print(f"Searching {config.cdse_tropomi_key} from {start_date} to {end_date}")
     print(f"Bounds: {west}, {south} to {east}, {north}")
 
-    response = requests.get(full_url)
-    if response.status_code != 200:
-        print(f"API Error: {response.status_code}")
-        return pd.DataFrame()
-
-    df = pd.DataFrame.from_dict(response.json()['value'])
-
-    # Filter for Offline (OFFL) as per your original requirement
-    if not df.empty:
-        df = df[df['Name'].str.contains('OFFL', case=False, na=False)]
+    if config.diag_key == 'chocho':
+        bbox = [west, south, east, north]
+        df = fetch_tropomi_chocho_metadata_online(start_date, end_date, bbox)  # config.download_dir)
+    else:
+        df = fetch_tropomi_metadata_online(start_date, end_date, wkt_polygon, config.cdse_tropomi_key)
 
     add_dates_to_metadata(df)
 
     return df
 
 
-# Usage:
-# df_metadata = fetch_tropomi_from_wrf_folder('NO2', '/path/to/wrf/output/')
-
-
-def fetch_online_tropomi_metadata(key):  # TBD
+def fetch_online_tropomi_metadata_TBD(key):  # TBD
     '''
+    TODO:TBD
+
     ask for Reprocessing (RPRO) rather than Offline (OFFL)
     Request for L2__SO2___ L2__CH4___ L2__HCHO__ L2__CO____ L2__NO2___ L2__O3____
     :param key:
@@ -169,6 +245,19 @@ def get_tropomi_files_metadata(fp):
     df = pd.read_csv(fp)
     add_dates_to_metadata(df)
     return df
+
+
+def prepare_tropomi_meta_data(config):
+    print(config.tropomi_meta_data_fps[config.diag_key])
+    # initialize_config(config)
+    meta_df = get_tropomi_files_metadata(config.tropomi_meta_data_fps[config.diag_key])
+    print('meta size before filtering: {}'.format(meta_df.index.size))
+
+    # Only keep orbits with enough data
+    derive_information_fraction(meta_df, config.tropomi_key, config.wrf_grid_id)
+    meta_df = meta_df[(meta_df['Information_fraction'] > 0.15)]
+    print('meta size after filtering: {}'.format(meta_df.index.size))
+    return meta_df
 
 
 def derive_tropomi_ch4_pressure_grid(tropomi_ds):
@@ -206,9 +295,43 @@ def derive_tropomi_o3_pr_pressure_grid(tropomi_ds):
         tropomi_ds.p_rho.attrs['long_name'] = 'rho pressure grid'
 
 
+def derive_tropomi_co_pressure_grid(tropomi_ds):
+    '''
+    pressure_levels: Pressure of the layer interfaces of the vertical grid. The pressures indicate the pressure at the bottom of each layer. The topmost layer extends to the top of atmosphere.
+    :param tropomi_ds:
+    :return:
+    '''
+    with xr.set_options(keep_attrs=True):
+        # for CO product, layer means rho grid. But pressure is given at bottom interface and reuses same dimension (but should be level or staggered). Here I'm fixing it.
+        toa_pressure = xr.zeros_like(tropomi_ds.pressure_levels.isel(layer=0))
+        toa_pressure = toa_pressure.expand_dims('layer', axis=-1)
+        p_stag_grid = xr.concat([toa_pressure, tropomi_ds.pressure_levels], dim='layer')
+        p_stag_grid = p_stag_grid.rename({'layer': 'level'})
+        tropomi_ds['p_stag'] = p_stag_grid
+        tropomi_ds.p_stag.attrs['long_name'] = 'staggered pressure grid'
+
+        tropomi_ds['p_rho'] = tropomi_ds.p_stag.rolling(level=2).mean().isel(level=slice(1, None)).rename({'level': 'layer'})
+        tropomi_ds.p_rho.attrs['long_name'] = 'rho pressure grid'
+
+
+def derive_tropomi_hcho_pressure_grid(tropomi_ds):
+    '''
+    Vertical Grid: Same as NO2/SO2 (TM5 based)
+    Section 8.5: https://sentiwiki.copernicus.eu/__attachments/1673595/S5P-L2-DLR-PUM-400F%20-%20Sentinel-5P%20Level%202%20Product%20User%20Manual%20Formaldehyde%20HCHO%202022%20-%202.4.pdf?inst-v=87ef0ca0-8091-4ed6-bc9f-05ea3a6bc632#page=17.75
+    :param tropomi_ds:
+    :return:
+    '''
+    derive_tropomi_so2_pressure_grid(tropomi_ds)
+
+
+def derive_tropomi_chocho_pressure_grid(tropomi_ds):
+    tropomi_ds['p_rho'] = tropomi_ds.glyoxal_profile_apriori_pressure
+    # tropomi_ds.p_rho.attrs['units'] = tropomi_ds.surface_pressure.units
+    # tropomi_ds.p_rho.attrs['long_name'] = 'rho pressure grid'
+
 def prep_tropomi_data(fp):
     ds = xr.open_dataset(fp, group='PRODUCT')
-    if 'latitude' in ds.coords:
+    if 'latitude' in ds.coords or 'latitude' in ds.data_vars:
         ds = ds.rename({'latitude': 'lat', 'longitude': 'lon'})
     ds = ds.set_coords(['lat', 'lon'])
     ds = ds.squeeze()
@@ -271,11 +394,20 @@ def visualize_pcolormesh(data_array, longitude, latitude, projection, color_scal
         ax.gridlines()
 
     cbar = fig.colorbar(img, ax=ax, orientation='horizontal', fraction=0.04, pad=0.1)
+
+    # Format the ticks to use scientific notation
+    formatter = ticker.ScalarFormatter(useMathText=True)
+    formatter.set_scientific(True)
+    formatter.set_powerlimits((-3, 3))  # Triggers notation if < 0.001 or > 1000
+    cbar.ax.xaxis.set_major_formatter(formatter)
+
     cbar.set_label(unit, fontsize=16)
     cbar.ax.tick_params(labelsize=14)
+    cbar.ax.xaxis.get_offset_text().set_fontsize(16)  # # 2. Increase the size of the multiplier (e.g., the 10^-6)
+
     ax.set_title(long_name, fontsize=20, pad=20.0)
 
-    return fig, ax
+    return fig, ax, cbar
 
 
 def regrid_tropomi_on_wrf_grid_in_batch(tropomi_meta_df: pd.DataFrame, wrf_grid: str = 'AQABA_d01', tropomi_key: str = 'methane_mixing_ratio_bias_corrected'):
@@ -315,6 +447,8 @@ def regrid_tropomi_on_wrf_grid_in_batch(tropomi_meta_df: pd.DataFrame, wrf_grid:
         # Jupyter Notebook version
         # %run $script_path - -wrf_in = {wrf_in} - -tropomi_in = {tropomi_in} - -tropomi_out = {tropomi_out} - -tropomi_key = {tropomi_key}
 
+        # print(f'--wrf_in={wrf_in} --tropomi_in={tropomi_in} --tropomi_out={tropomi_out} --tropomi_key={tropomi_key}')
+
         # Pure python version
         args = Namespace(
             wrf_in=wrf_in,
@@ -323,3 +457,132 @@ def regrid_tropomi_on_wrf_grid_in_batch(tropomi_meta_df: pd.DataFrame, wrf_grid:
             tropomi_key=tropomi_key
         )
         regrid_tropomi_on_wrf_grid(args)
+
+
+def download_tropomi(meta_df):
+    '''
+    Getting List of TROPOMI files, CDSE Approach
+    Alternative way to Download TROPOMI: https://gist.github.com/nicholasbalasus/008b34590fbc55b757fbd879bb64ccc0
+    :param meta_df:
+    :return:
+    '''
+    import eofetch
+
+    sentinel_data_root_path = SENTINEL_DATA_ROOT_PATH
+    display('Downloading TROPOMI files to: {}'.format(sentinel_data_root_path))
+    configure_tropomi_credentials()
+
+    for index, row in meta_df.iterrows():
+        print('downloading {}'.format(row.Name), end='\r')
+        eofetch.download(row.Name, target_directory=sentinel_data_root_path)
+
+    print("Done")
+
+
+def download_tropomi_chocho(meta_df):
+    """
+    Step 2: Takes the metadata DataFrame and downloads the missing L2 orbit files.
+    """
+
+    if meta_df.empty:
+        print("Metadata DataFrame is empty. Nothing to download.")
+        return meta_df
+
+    print(f"Checking and downloading {len(meta_df)} CHOCHO files...")
+
+    # Using itertuples to match your existing tropomi_utils loop style
+    for row in meta_df.itertuples():
+        filepath = row.tropomi_granule_fp
+        download_url = row.download_url
+        safe_filename = row.safe_filename
+
+        # Ensure the target directory exists before writing
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        if os.path.exists(filepath):
+            print(f"  -> Skipping: {safe_filename} (already downloaded)")
+            continue
+
+        print(f"  -> Downloading: {safe_filename}...")
+        try:
+            # Stream the large NetCDF file in chunks to save RAM
+            with requests.get(download_url, stream=True) as r:
+                r.raise_for_status()
+                with open(filepath, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+        except Exception as e:
+            print(f"     Failed to download {safe_filename}: {e}")
+
+    print("Download sequence complete.")
+    return meta_df
+
+
+def prepare_tropomi_metadata(config):
+    diag_fp = config.tropomi_meta_data_fps[config.diag_key]
+    if os.path.exists(diag_fp):
+        print('Reading existing metadata from {}'.format(diag_fp))
+        meta_df = pd.read_csv(diag_fp)
+    else:
+        meta_df = fetch_tropomi_from_wrf_folder(config)#, wrf_date_format='%Y-%m-%d_%H:%M:%S')
+
+        if config.wrf_filter_dates: meta_df = meta_df[meta_df['start_date'].between(config.wrf_filter_dates[0], config.wrf_filter_dates[1])]
+
+        # Build the WRF post-processing list to derive TROPOMI-like diagnostics
+        meta_df['wrfin_file'] = meta_df['start_date'].apply(lambda x: x.strftime('wrfout_d01_%Y-%m-%d_00_00_00'))  # name of the wrf output
+        meta_df['wrfout_file'] = meta_df['start_date'].apply(lambda x: x.strftime('wrfout_d01_%Y-%m-%d_%H_%M_%S'))  # name for the pp-ed wrf file
+
+        # Save list of files for processing
+        print('Saving metadata to \n{}'.format(diag_fp))
+        Path(diag_fp).parent.mkdir(parents=True, exist_ok=True)  # # 2. Extract the parent directory and create it
+        meta_df.to_csv(diag_fp, index=False)#, header=['Name'])
+
+    if 'Id' in meta_df.columns:
+        display(meta_df[['Id', 'Name', 'S3Path', 'GeoFootprint']].head(3))
+        display(meta_df[['Name', 'start_date', 'wrfin_file' , 'wrfout_file']].head(3))
+
+    return meta_df
+
+
+def process_metadata_deriving_tropomi_like_diags(meta_df, config):
+    meta_df['wrf_tropomi_like_diag_fp'] = meta_df.wrfout_file.apply(lambda x: Path(config.wrf_output_folder_path) / 'pp/tropomi_like_{}/'.format(config.diag_key.lower()) / x)  # add file name of the wrf output sampled at station locations
+    meta_df['wrfout_fp'] = meta_df.wrfin_file.apply(lambda x: Path(config.wrf_output_folder_path) / x)  # add file name of the wrf output sampled at station locations
+    meta_df['tropomi_granule_fp'] = meta_df.Name.apply(lambda x: Path(SENTINEL_DATA_ROOT_PATH) / '{}'.format(config.wrf_grid_id) / x)
+
+    for row in meta_df.itertuples():
+        wrf_in = row.wrfout_fp
+        wrf_out = row.wrf_tropomi_like_diag_fp
+        tropomi_in = row.tropomi_granule_fp
+
+        if os.path.exists(wrf_out):
+            print(f"  -> Skipping: Output already exists at {wrf_out}")
+            continue
+
+        # %run /home/osipovs/PycharmProjects/ClimPy/climpy/wrf/pp_wrf_like_tropomi_ch4.py --wrf_in={wrf_in} --wrf_out={wrf_out} --tropomi_in={tropomi_in}
+
+        # Pure python version
+        args = Namespace(
+            wrf_in=wrf_in,
+            wrf_out=wrf_out,
+            tropomi_in=tropomi_in,
+        )
+
+        from climpy.wrf.pp_wrf_like_tropomi_ch4 import pp_wrf_like_tropomi_ch4
+        from climpy.wrf.pp_wrf_like_tropomi_co import pp_wrf_like_tropomi_co
+        from climpy.wrf.pp_wrf_like_tropomi_hcho import pp_wrf_like_tropomi_hcho
+        from climpy.wrf.pp_wrf_like_tropomi_no2 import pp_wrf_like_tropomi_no2
+        from climpy.wrf.pp_wrf_like_tropomi_so2 import pp_wrf_like_tropomi_so2
+        from climpy.wrf.pp_wrf_like_tropomi_chocho import pp_wrf_like_tropomi_chocho
+
+        processors = {
+            'ch4': pp_wrf_like_tropomi_ch4,
+            'no2': pp_wrf_like_tropomi_no2,
+            'so2': pp_wrf_like_tropomi_so2,
+            'co' : pp_wrf_like_tropomi_co,
+            'hcho': pp_wrf_like_tropomi_hcho,
+            'chocho': pp_wrf_like_tropomi_chocho,
+        }
+        pp_wrf_like_tropomi_impl = processors[config.diag_key.lower()]
+        pp_wrf_like_tropomi_impl(args)
+
+        # print('\nNext item in meta_df\n')

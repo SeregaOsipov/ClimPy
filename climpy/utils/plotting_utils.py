@@ -133,6 +133,14 @@ def get_manual_colormap(name):
             palette = ['white', '#A7CAB7', 'cyan', '#2C5F2D', 'yellow', 'red', 'brown']
         case 'emissions_v2':
             palette = ['#EEEEEE', '#A7CAB7', 'cyan', '#2C5F2D', 'yellow', 'red', 'brown']
+        case 'emissions_v3':
+            pos_palette = ['#EEEEEE', '#A7CAB7', 'cyan', '#2C5F2D', 'yellow', 'red', 'brown']
+            # neg_palette = ['#00008B', '#4169E1', '#87CEEB', '#EEEEEE']  # brigh
+            neg_palette = ['#08306b', '#4292c6', '#deebf7', '#EEEEEE']  # less saturated
+            cm_neg = LinearSegmentedColormap.from_list('Neg', neg_palette, N=128)
+            cm_pos = LinearSegmentedColormap.from_list('Pos', pos_palette, N=128)
+            palette = np.vstack((cm_neg(np.linspace(0, 1, 128)),
+                                    cm_pos(np.linspace(0, 1, 128))))
 
     cm = LinearSegmentedColormap.from_list('GEE', palette, N=256)
 

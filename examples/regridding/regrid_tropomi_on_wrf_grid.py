@@ -27,7 +27,8 @@ python -u ${CLIMPY}/examples/regridding/regrid_tropomi_on_wrf_grid.py --tropomi_
 
 
 def regrid_tropomi_on_wrf_grid(args):
-    print('Will regrid this TROPOMI onto this WRF:\nin grid {}\nout grid {}'.format(args.tropomi_in, args.wrf_in))
+    print('Regridding TROPOMI onto WRF grid')
+    print(f'--wrf_in={args.wrf_in} --tropomi_in={args.tropomi_in} --tropomi_out={args.tropomi_out} --tropomi_key={args.tropomi_key}')
     # %% Build source grid & var. Conservative regridding requires corners
     wrf_grid_ds = xr.open_dataset(args.wrf_in)
     wrf_grid_ds = wrf_grid_ds.isel(Time=0)
@@ -74,19 +75,36 @@ def regrid_tropomi_on_wrf_grid(args):
         print('Processing NO2 switch')
         keys = ['nitrogendioxide_tropospheric_column', 'qa_value', 'time_utc', 'averaging_kernel', 'air_mass_factor_troposphere', 'air_mass_factor_total', 'tm5_constant_a', 'tm5_constant_b', 'tm5_tropopause_layer_index']
         ds_in = xr.merge([product_ds[keys], lat_b, lon_b, input_data_ds[['surface_pressure']]])
-        ds_in = ds_in.set_coords(['tm5_constant_a', 'tm5_constant_b'])  # set as coordinates to avoid losing them, as they don't depend on lat/lon
     elif diag_key == 'SO2':
         print('Processing SO2 switch')
         keys = ['sulfurdioxide_total_vertical_column', 'qa_value', 'time_utc']
         ds_in = xr.merge([product_ds[keys], lat_b, lon_b, details_ds[['averaging_kernel', 'sulfurdioxide_profile_apriori']], input_data_ds[['surface_pressure', 'tm5_constant_a', 'tm5_constant_b']]])
-        ds_in = ds_in.set_coords(['tm5_constant_a', 'tm5_constant_b'])  # set as coordinates to avoid losing them, as they don't depend on lat/lon
     elif diag_key == 'O3__PR':
         print('Processing O3 Profile switch')
         keys = ['ozone_profile', 'qa_value', 'time_utc', 'pressure']
         ds_in = xr.merge([product_ds[keys], lat_b, lon_b, details_ds[['averaging_kernel']], input_data_ds[['ozone_profile_apriori']]])
+    elif diag_key == 'CO':
+        '''
+        pressure_levels: Pressure of the layer interfaces of the vertical grid. The pressures indicate the pressure at the bottom of each layer. The topmost layer extends to the top of atmosphere.
+        '''
+        print('Processing CO switch')
+        keys = ['carbonmonoxide_total_column', 'carbonmonoxide_total_column_corrected', 'qa_value', 'time_utc']  # corrected variables are destripped
+        ds_in = xr.merge([product_ds[keys], lat_b, lon_b, details_ds[['column_averaging_kernel', 'pressure_levels']], input_data_ds[['surface_pressure', 'carbonmonoxide_profile_apriori']]])
+    elif diag_key == 'HCHO':
+        print('Processing HCHO switch')
+        keys = ['formaldehyde_tropospheric_vertical_column', 'qa_value', 'time_utc']
+        ds_in = xr.merge([product_ds[keys], lat_b, lon_b, details_ds[['averaging_kernel', 'formaldehyde_profile_apriori']], input_data_ds[['surface_pressure', 'tm5_constant_a', 'tm5_constant_b', 'tm5_tropopause_layer_index']]])
+    elif diag_key == 'CHOCHO':
+        print('Processing CHOCHO switch')
+        keys = ['glyoxal_tropospheric_vertical_column', 'qa_value', 'time']
+        # This product uses MAGRITTE instead of TM5-MP chem transport model. Hence pressure is precomputed
+        ds_in = xr.merge([product_ds[keys], lat_b, lon_b, details_ds[['averaging_kernel', 'glyoxal_profile_apriori', 'glyoxal_profile_apriori_pressure']], input_data_ds[['surface_pressure', ]]])
     else:
         raise Exception('diag key is not recognized')
+
     ds_in = ds_in.squeeze()  # do the squeeze last after merging
+    if 'tm5_constant_a' in ds_in.data_vars:
+        ds_in = ds_in.set_coords(['tm5_constant_a', 'tm5_constant_b'])  # set as coordinates to avoid losing them, as they don't depend on lat/lon
     # ds_in = ds_in.assign_coords(time=[pd.to_datetime(ds_in.time_utc.values).mean()])  # original TROPOMI time is only accurate within a day. Take a mean of the exact time across the scanline and add to the dataset
     # ds_in['time'][...] = pd.to_datetime(ds_in.time_utc.values).mean()  # TODO: SO2 product reports "-" instead of time. A work around is to combine time_delta + time_reference
     ds_in['time'][...] = tropomi_root_ds.attrs['time_coverage_start']  # TODO: set time based on the file name
@@ -102,10 +120,11 @@ def regrid_tropomi_on_wrf_grid(args):
     regridder = xe.Regridder(ds_in, ds_out, method='bilinear')  # conservative  # conservative_normed
 
     ds_out = regridder(ds_in)
-    for key in ds_in.data_vars:
-        if 'units' in ds_in[key].attrs:
-            ds_out[key].attrs['units'] = ds_in[key].units
-            ds_out[key].attrs['long_name'] = ds_in[key].long_name
+    for key in ds_out.data_vars:
+        ds_out[key].attrs.update(ds_in[key].attrs)
+        # if 'units' in ds_in[key].attrs:
+        #     ds_out[key].attrs['units'] = ds_in[key].units
+        #     ds_out[key].attrs['long_name'] = ds_in[key].long_name
 
     # add coordinates
     ds_out['lat'] = wrf_grid_ds.XLAT_M
@@ -142,11 +161,11 @@ if __name__ == "__main__":
     # args.tropomi_out = data_root + 'THOFA_d02/S5P_OFFL_L2__SO2____20230601T081351_20230601T095521_29183_03_020401_20230603T102223.nc'
     # args.tropomi_key = 'sulfurdioxide_total_vertical_column'
     
-    data_root = '/project/k10048/osipovs//Data/Copernicus/Sentinel-5P/'
-    args.wrf_in = data_root + '/THOFA_d02/geo_em.nc'
-    args.tropomi_in = data_root + 'S5P_OFFL_L2__O3__PR_20230601T081351_20230601T095521_29183_03_020500_20230603T044544.nc'  # regional
-    args.tropomi_out = data_root + 'THOFA_d02/S5P_OFFL_L2__O3__PR_20230601T081351_20230601T095521_29183_03_020500_20230603T044544.nc'
-    args.tropomi_key = 'ozone_profile'
+    # data_root = '/project/k10048/osipovs//Data/Copernicus/Sentinel-5P/'
+    # args.wrf_in = data_root + '/THOFA_d02/geo_em.nc'
+    # args.tropomi_in = data_root + 'S5P_OFFL_L2__O3__PR_20230601T081351_20230601T095521_29183_03_020500_20230603T044544.nc'  # regional
+    # args.tropomi_out = data_root + 'THOFA_d02/S5P_OFFL_L2__O3__PR_20230601T081351_20230601T095521_29183_03_020500_20230603T044544.nc'
+    # args.tropomi_key = 'ozone_profile'
 
     # args.tropomi_in = data_root + 'S5P_OFFL_L2__HCHO___20230601T081351_20230601T095521_29183_03_020401_20230603T044522.nc'  # regional
     # args.tropomi_out = data_root + 'd02/S5P_OFFL_L2__HCHO___20230601T081351_20230601T095521_29183_03_020401_20230603T044522.nc'

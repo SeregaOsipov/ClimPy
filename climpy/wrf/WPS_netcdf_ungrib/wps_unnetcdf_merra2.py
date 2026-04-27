@@ -33,8 +33,7 @@ python -u ${CLIMPY}/climpy/wrf/WPS_netcdf_ungrib/wps_unnetcdf_merra2.py --start_
 
 TODO: replace MERRA2 predownloading with the OpenDAP access
 
-To process by month in parallel, use wps_unnetcdf_merra2_in_parallel.sh
-
+To process in parallel, use wps_unnetcdf_merra2_in_parallel.sh
 '''
 
 parser = argparse.ArgumentParser()

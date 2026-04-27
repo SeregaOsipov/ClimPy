@@ -4,7 +4,7 @@ import numpy as np
 import xarray as xr
 import argparse
 from climpy.utils.tropomi_utils import derive_tropomi_o3_pr_pressure_grid
-from climpy.utils.wrf_utils import compute_dz, compute_p, compute_stag_p, calculate_air_mass_dry, interpolate_wrf_diag_to_tropomi_rho_pressure_grid, generate_xarray_uniform_time_data
+from climpy.utils.wrf_utils import compute_dz, compute_p, compute_stag_p, calculate_air_mass_dry, interpolate_wrf_diag_to_tropomi_rho_pressure_grid, generate_xarray_uniform_time_data, fix_time_variable_in_wrf_output
 
 __author__ = 'Sergey Osipov <Serega.Osipov@gmail.com>'
 
@@ -15,14 +15,11 @@ Script derives TROPOMI-specific diagnostics to enable WRF-Chem-TROPOMI compariso
 
 
 def pp_wrf_like_tropomi_o3_profile(args):
-    print('Will process this WRF:\nin {}\nout {}'.format(args.wrf_in, args.wrf_out))
+    print('pp_wrf_like_tropomi_o3')
+    print(f'--wrf_in={args.wrf_in} --wrf_out={args.wrf_out} --tropomi_in={args.tropomi_in} --tropomi_key={args.tropomi_key}')
     # %% Prep WRF
     wrf_ds = xr.open_dataset(args.wrf_in)
-    if 'XTIME' in wrf_ds.dims:
-        wrf_ds = wrf_ds.rename({'XTIME': 'Time'}).rename({'Time': 'time'})
-    else:
-        wrf_ds['time'] = generate_xarray_uniform_time_data(wrf_ds.Times)
-        wrf_ds = wrf_ds.rename({'Time': 'time'})
+    wrf_ds = fix_time_variable_in_wrf_output(wrf_ds)
     # %% Prep TROPOMI
     tropomi_ds = xr.open_dataset(args.tropomi_in)
     derive_tropomi_o3_pr_pressure_grid(tropomi_ds)
@@ -30,8 +27,10 @@ def pp_wrf_like_tropomi_o3_profile(args):
     # %% Minimize the WRF ds size and interpolate in time
     keys = ['PH', 'PHB', 'P', 'PB', 'PSFC', 'ZNW', 'MUB', 'MU'] + ['o3']
     wrf_ds = wrf_ds[keys]
-    wrf_ds = wrf_ds.interp(time=tropomi_ds.time, method='linear')
-
+    wrf_ds = wrf_ds.interp(time=tropomi_ds.time, method='linear', kwargs={'bounds_error': True})
+    if 'time' not in wrf_ds.dims:  # If time is now a coordinate but not a dimension, put it back. This helps with concatenating later on
+        wrf_ds = wrf_ds.expand_dims('time').transpose('time', ...)
+    wrf_ds.encoding['unlimited_dims'] = {'time'}
     # %% Deriving intermediate diagnostics
     compute_dz(wrf_ds)
     compute_p(wrf_ds)
@@ -110,7 +109,7 @@ def pp_wrf_like_tropomi_o3_profile(args):
     os.makedirs(os.path.dirname(args.wrf_out), exist_ok=True)
 
     export_keys = ['ozone_profile', ]
-    wrf_ds[export_keys].to_netcdf(args.wrf_out)
+    wrf_ds[export_keys].transpose('time', ...).to_netcdf(args.wrf_out)  # , mode=mode, unlimited_dims=unlimited_dim, format='NETCDF4_CLASSIC')
     print('Done')
 
 

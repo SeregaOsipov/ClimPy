@@ -10,7 +10,7 @@ import xarray as xr
 import wrf as wrf
 import argparse
 from climpy.utils.tropomi_utils import TROPOMI_in_WRF_KEYS, derive_tropomi_so2_pressure_grid
-from climpy.utils.wrf_utils import compute_stag_pressure, compute_stag_z, compute_dz, calculate_air_mass_dry, compute_stag_pressure_impl, compute_p, compute_stag_p, average_wrf_diag_between_tropomi_staggered_pressure_grid, interpolate_wrf_diag_to_tropomi_rho_pressure_grid, generate_netcdf_uniform_time_data, generate_xarray_uniform_time_data
+from climpy.utils.wrf_utils import compute_stag_pressure, compute_stag_z, compute_dz, calculate_air_mass_dry, compute_stag_pressure_impl, compute_p, compute_stag_p, average_wrf_diag_between_tropomi_staggered_pressure_grid, interpolate_wrf_diag_to_tropomi_rho_pressure_grid, generate_netcdf_uniform_time_data, generate_xarray_uniform_time_data, fix_time_variable_in_wrf_output
 from wrf import Constants
 import datetime as dt
 
@@ -24,21 +24,21 @@ TROPOMI User Guide: https://sentiwiki.copernicus.eu/__attachments/1673595/S5P-L2
 
 
 def pp_wrf_like_tropomi_so2(args):
-    print('Will process this WRF:\nin {}\nout {}'.format(args.wrf_in, args.wrf_out))
+    print('pp_wrf_like_tropomi_so2')
+    print(f'--wrf_in={args.wrf_in} --wrf_out={args.wrf_out} --tropomi_in={args.tropomi_in}')
     # %% Prep WRF
     wrf_ds = xr.open_dataset(args.wrf_in)
-    if 'XTIME' in wrf_ds.dims:
-        wrf_ds = wrf_ds.rename({'XTIME': 'time'})
-    else:
-        wrf_ds['time'] = generate_xarray_uniform_time_data(wrf_ds.Times)
-    wrf_ds = wrf_ds.rename({'Time': 'time'})
+    wrf_ds = fix_time_variable_in_wrf_output(wrf_ds)
     # %% Prep TROPOMI
     tropomi_ds = xr.open_dataset(args.tropomi_in)
     derive_tropomi_so2_pressure_grid(tropomi_ds)
     # %% Minimize the WRF ds size and interpolate in time
     keys = ['PH', 'PHB', 'P', 'PB', 'PSFC', 'ZNW', 'MUB', 'MU'] + ['so2']
     wrf_ds = wrf_ds[keys]
-    wrf_ds = wrf_ds.interp(time=tropomi_ds.time, method='linear')
+    wrf_ds = wrf_ds.interp(time=tropomi_ds.time, method='linear', kwargs={'bounds_error': True})
+    if 'time' not in wrf_ds.dims:  # If time is now a coordinate but not a dimension, put it back. This helps with concatenating later on
+        wrf_ds = wrf_ds.expand_dims('time').transpose('time', ...)
+    wrf_ds.encoding['unlimited_dims'] = {'time'}
     # %% Deriving intermediate diagnostics
     compute_dz(wrf_ds)
     compute_p(wrf_ds)
@@ -54,8 +54,8 @@ def pp_wrf_like_tropomi_so2(args):
     wrf_ds['dvair'] /= DRY_AIR_MOLAR_MASS  # mol/m2 = kg / m^2 / (kg mol-1)  # dry air column
 
     wrf_ds['dvso2'] = 10 ** -6 * wrf_ds['xso2'] * wrf_ds['dvair']  # mol/m2 of so2
-    wrf_ds['vso2'] = tropomi_ds.sulfurdioxide_profile_apriori.sum(dim='layer') + (tropomi_ds.averaging_kernel * (wrf_ds['dvso2'] - tropomi_ds.sulfurdioxide_profile_apriori)).sum(dim='layer')
-    # wrf_ds['vso2'] = (10 ** -6 * wrf_ds['xso2'] * wrf_ds['dvair'] * tropomi_ds.averaging_kernel).sum(dim='layer')  # mol/m2 of so2  # no a priori profile
+    wrf_ds['vso2'] = tropomi_ds.sulfurdioxide_profile_apriori.sum(dim='layer', min_count=1) + (tropomi_ds.averaging_kernel * (wrf_ds['dvso2'] - tropomi_ds.sulfurdioxide_profile_apriori)).sum(dim='layer', min_count=1)
+    # wrf_ds['vso2'] = (10 ** -6 * wrf_ds['xso2'] * wrf_ds['dvair'] * tropomi_ds.averaging_kernel).sum(dim='layer', min_count=1)  # mol/m2 of so2  # no a priori profile
     wrf_ds['xso2_like_tropomi'] = wrf_ds.vso2
 
     # wrf_ds['xso2_like_tropomi'] = 10 ** 9 * wrf_ds['vso2'] / wrf_ds['dvair'].sum('layer')  # ppbv. This is converts back to volume mixing ratio
@@ -70,7 +70,7 @@ def pp_wrf_like_tropomi_so2(args):
     os.makedirs(os.path.dirname(args.wrf_out), exist_ok=True)
 
     export_keys = ['sulfurdioxide_total_vertical_column', ]
-    wrf_ds[export_keys].to_netcdf(args.wrf_out)  # , mode=mode, unlimited_dims=unlimited_dim, format='NETCDF4_CLASSIC')
+    wrf_ds[export_keys].transpose('time', ...).to_netcdf(args.wrf_out)  # , mode=mode, unlimited_dims=unlimited_dim, format='NETCDF4_CLASSIC')
     print('Done')
 
 
