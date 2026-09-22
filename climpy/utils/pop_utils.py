@@ -28,7 +28,11 @@ def compute_pop_weighted_diags_by_country(xr_in, population_ds=None):
     # middle_eastern_countries_in_AQABA_WRF_domain = middle_eastern_countries_in_AQABA_WRF_domain[0:3]  # debug
 
     regionmask_countries = regionmask.defined_regions.natural_earth_v5_0_0.countries_50
-    mask = regionmask_countries.mask(xr_in.isel(Time=0))  # mask all countries even partial overlap
+    if 'Time' in xr_in.dims:
+        xr_in_t0 = xr_in.isel(Time=0)
+    else:
+        xr_in_t0 = xr_in
+    mask = regionmask_countries.mask(xr_in_t0)  # mask all countries even partial overlap
 
     def weight_and_average_ds(in_country_ds, population_as_weight_ds=None):
         if population_as_weight_ds is None:
