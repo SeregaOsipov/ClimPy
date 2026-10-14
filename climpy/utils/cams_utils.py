@@ -62,7 +62,17 @@ def derive_cams_pressure_profile(reanalysis_ml_ds, reanalysis_sfc_ds):
     '''
 
     # derive A and B coefficients (hybrid sigma-pressure vertical grid)
-    pv = reanalysis_ml_ds.ch4_c.GRIB_pv
+    pv = None
+    if 'pv' in reanalysis_ml_ds:
+        pv = reanalysis_ml_ds['pv'].values
+    else:
+        for var in reanalysis_ml_ds.data_vars:
+            if hasattr(reanalysis_ml_ds[var], 'GRIB_pv'):
+                pv = reanalysis_ml_ds[var].GRIB_pv
+                break
+    if pv is None:
+        raise AttributeError("No variable with GRIB_pv or 'pv' found in CAMS dataset.")
+
     num_levels = reanalysis_ml_ds.sizes['level']
     a = pv[:num_levels + 1]
     b = pv[num_levels + 1:]
