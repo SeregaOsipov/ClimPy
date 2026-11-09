@@ -26,6 +26,9 @@ def set_env(env):
     if env == 'Shaheen':
         root_path = STORAGE_PATH_SHAHEEN
         root_data_path = STORAGE_PATH_SHAHEEN
+    if env == 'qeeri_tower_7810':
+        root_path = '/scratch'
+        root_data_path = '/scratch'
 
 
 def get_root_path_on_hpc():

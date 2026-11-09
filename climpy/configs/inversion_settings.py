@@ -59,8 +59,8 @@ def initialize_tropomi_section_of_wrf_config(wrf_config, tropomi_species_configs
 
 def generate_inversion_config(inversion_version='v2', mapping_version='vTHOFA_TROPOMI', emissions_srs_version=EMISSIONS_SRM_V1):  # vETH
     base_dir = Path(get_root_storage_path_on_hpc())
-    base_dir = Path('/scratch/osipovs/')  # temp fix
-    print('Manually set base dir to /scratch/osipovs/')
+    base_dir = Path('/scratch/')  # temp fix
+    print('Manually set base dir to /scratch/')
     inv_root = base_dir / 'Data/AirQuality/THOFA/inversion'
     versioned_inv_root = inv_root / inversion_version / 'derivatives' / emissions_srs_version
 
@@ -128,7 +128,7 @@ def get_tropomi_like_inversion_config(tropomi_specie_config, default_inversion_c
     return merged_config
 
 
-def get_latest_version_of_inversion_configs(inversion_version='v2', mapping_version='vTHOFA_TROPOMI', wrf_scenario='ref', emissions_srs_version=None):  # Utility function that combines the latest setup
+def get_latest_version_of_inversion_configs(inversion_version='v2', mapping_version='vTHOFA_TROPOMI', wrf_scenario='ref', emissions_srs_version='None'):  # Utility function that combines the latest setup
     # get sources mapping
     default_inversion_config = generate_inversion_config(inversion_version, mapping_version, emissions_srs_version)
     sources_mapping_ds = get_sources_mapping_ds(default_inversion_config)
